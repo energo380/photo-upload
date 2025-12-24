@@ -37,7 +37,7 @@
 
     h1 {
       color: #333;
-      margin-bottom: 30px;
+      margin-bottom: 16px;
       text-align: center;
       font-size: 28px;
     }
@@ -71,13 +71,6 @@
       box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     }
 
-    .meta {
-      margin-top: 10px;
-      font-size: 13px;
-      color: #666;
-      text-align: center;
-    }
-
     .button-group {
       margin-top: 22px;
       display: flex;
@@ -97,7 +90,6 @@
 
     .btn-send { background: #4CAF50; color: white; }
     .btn-send:hover { background: #45a049; transform: translateY(-1px); }
-
     .btn-send:disabled { background: #cccccc; cursor: not-allowed; transform: none; }
 
     .btn-cancel { background: #f44336; color: white; }
@@ -130,6 +122,7 @@
     @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="company-name">
@@ -137,7 +130,7 @@
       АО "Новосибирская птицефабрика"
     </div>
 
-    <h1>📸 Загрузите фото</h1>
+    <h1>Загрузите фото</h1>
 
     <form id="photoForm">
       <label for="photo" class="upload-area" id="uploadArea">
@@ -145,14 +138,14 @@
         <div class="upload-text">Нажмите для выбора фото</div>
         <div class="upload-hint">или сделайте снимок камерой</div>
       </label>
+
       <input type="file" id="photo" name="photo" accept="image/*" capture="environment" required>
 
       <div class="preview" id="preview"></div>
-      <div class="meta" id="meta"></div>
 
       <div class="button-group" id="buttonGroup" style="display:none;">
-        <button type="submit" class="btn btn-send" id="sendBtn">✉️ Отправить фото</button>
-        <button type="button" class="btn btn-cancel" id="cancelBtn">❌ Отменить</button>
+        <button type="submit" class="btn btn-send" id="sendBtn">Отправить фото</button>
+        <button type="button" class="btn btn-cancel" id="cancelBtn">Отменить</button>
       </div>
     </form>
 
@@ -160,19 +153,11 @@
   </div>
 
   <script>
-    // === Web3Forms настройки ===
-    const WEB3FORMS_ACCESS_KEY = "d5431e0c-180c-402a-ad50-ec4a38a36a2c";
-    const TO_EMAIL = "oge@energo-380.ru";
-
-    // Ограничения/сжатие, чтобы письмо не стало слишком большим
-    const MAX_ORIGINAL_MB = 12;           // исходный файл максимум
-    const JPEG_QUALITY = 0.7;             // качество сжатия (0..1)
-    const MAX_SIDE = 1600;                // максимальная сторона картинки (px)
-    const MAX_BASE64_CHARS = 800_000;     // лимит текста base64 в письме (примерно)
+    const WORKER_URL = "https://tg-photo-proxy.jazogm.workers.dev";
+    const MAX_MB = 20; // лимит на клиенте, чтобы не слать совсем огромные файлы
 
     const photoInput = document.getElementById("photo");
     const preview = document.getElementById("preview");
-    const meta = document.getElementById("meta");
     const buttonGroup = document.getElementById("buttonGroup");
     const form = document.getElementById("photoForm");
     const status = document.getElementById("status");
@@ -180,7 +165,6 @@
     const sendBtn = document.getElementById("sendBtn");
 
     let selectedFile = null;
-    let preparedDataUrl = null; // сжатая картинка в dataURL (jpeg)
 
     function showStatus(message, type) {
       status.innerHTML = message;
@@ -191,104 +175,57 @@
     function resetAll() {
       form.reset();
       preview.innerHTML = "";
-      meta.textContent = "";
       buttonGroup.style.display = "none";
       status.style.display = "none";
       selectedFile = null;
-      preparedDataUrl = null;
       sendBtn.disabled = false;
     }
 
     cancelBtn.addEventListener("click", resetAll);
 
-    photoInput.addEventListener("change", async (e) => {
-      const file = e.target.files && e.target.files[0];
+    photoInput.addEventListener("change", () => {
+      const file = photoInput.files && photoInput.files[0];
       if (!file) return;
 
-      if (file.size > MAX_ORIGINAL_MB * 1024 * 1024) {
-        showStatus(`❌ Файл слишком большой. Максимум ${MAX_ORIGINAL_MB} МБ`, "error");
+      if (file.size > MAX_MB * 1024 * 1024) {
+        showStatus(`❌ Файл слишком большой. Максимум ${MAX_MB} МБ`, "error");
         return;
       }
 
       selectedFile = file;
 
-      try {
-        showStatus('<div class="spinner"></div><div style="margin-top:10px;">Подготовка фото...</div>', "loading");
-
-        const { dataUrl, width, height } = await compressImageToJpegDataUrl(file, MAX_SIDE, JPEG_QUALITY);
-        preparedDataUrl = dataUrl;
-
-        // превью
-        preview.innerHTML = `<img src="${dataUrl}" alt="preview">`;
-
-        const approxKb = Math.round((dataUrl.length * 3/4) / 1024); // грубая оценка
-        meta.textContent = `Подготовлено: ${width}×${height}, ~${approxKb} KB`;
-
-        if (dataUrl.length > MAX_BASE64_CHARS) {
-          showStatus("❌ Фото всё ещё слишком большое для отправки. Сделайте снимок меньшего размера или ближе/без зума, либо выберите другое фото.", "error");
-          buttonGroup.style.display = "none";
-          return;
-        }
-
-        status.style.display = "none";
-        buttonGroup.style.display = "flex";
-      } catch (err) {
-        console.error(err);
-        showStatus("❌ Не удалось подготовить фото. Попробуйте другое изображение.", "error");
-      }
+      const url = URL.createObjectURL(file);
+      preview.innerHTML = `<img src="${url}" alt="preview">`;
+      buttonGroup.style.display = "flex";
+      showStatus("Фото выбрано. Нажмите «Отправить фото».", "success");
     });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      if (!selectedFile || !preparedDataUrl) {
+      if (!selectedFile) {
         showStatus("❌ Выберите фото.", "error");
         return;
       }
 
       sendBtn.disabled = true;
       buttonGroup.style.display = "none";
-      showStatus('<div class="spinner"></div><div style="margin-top:10px;">Отправка...</div>', "loading");
+      showStatus('<div class="spinner"></div><div style="margin-top:10px;">Отправка в Telegram...</div>', "loading");
 
       try {
         const fd = new FormData();
-        fd.append("access_key", WEB3FORMS_ACCESS_KEY);
+        fd.append("photo", selectedFile, selectedFile.name || "photo.jpg");
+        fd.append("caption", `Фото с сайта. Файл: ${selectedFile.name || "photo.jpg"}`);
 
-        // Куда отправлять (Web3Forms использует to/replyto в зависимости от настроек; добавим явные поля)
-        fd.append("to", TO_EMAIL);
+        const res = await fetch(WORKER_URL, { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
 
-        // Тема/поля
-        fd.append("subject", 'Фото: Ремонт электродвигателей (АО "Новосибирская птицефабрика")');
-        fd.append("name", "Загрузка фото (сайт)");
-        fd.append("email", "no-reply@energo380.local"); // формально обязательное поле в примерах
-
-        // Сообщение + картинка как dataURL (в письме будет текстом; удобно переслать/сохранить)
-        fd.append("message",
-`Новое фото с сайта.
-
-Имя файла (ориг.): ${selectedFile.name}
-Тип: ${selectedFile.type}
-Размер (ориг.): ${(selectedFile.size/1024/1024).toFixed(2)} MB
-
-НИЖЕ dataURL (JPEG). Его можно скопировать в браузер/редактор, чтобы восстановить картинку:
-${preparedDataUrl}
-`);
-
-        // Анти-бот поле (honeypot)
-        fd.append("botcheck", "");
-
-        const res = await fetch("https://api.web3forms.com/submit", {
-          method: "POST",
-          body: fd
-        });
-
-        const json = await res.json();
-        if (!json.success) {
-          throw new Error(json.message || "Web3Forms error");
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || "Ошибка отправки (Worker/Telegram)");
         }
 
-        showStatus("✅ Отправлено! Проверьте почту (входящие/спам).", "success");
-        setTimeout(resetAll, 2500);
+        showStatus("✅ Отправлено в Telegram!", "success");
+        setTimeout(resetAll, 2000);
       } catch (err) {
         console.error(err);
         showStatus("❌ Ошибка отправки. Проверьте интернет и попробуйте ещё раз.", "error");
@@ -296,46 +233,6 @@ ${preparedDataUrl}
         sendBtn.disabled = false;
       }
     });
-
-    function compressImageToJpegDataUrl(file, maxSide, quality) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        const url = URL.createObjectURL(file);
-
-        img.onload = () => {
-          try {
-            const { width: w0, height: h0 } = img;
-
-            let w = w0, h = h0;
-            const scale = Math.min(1, maxSide / Math.max(w0, h0));
-            w = Math.round(w0 * scale);
-            h = Math.round(h0 * scale);
-
-            const canvas = document.createElement("canvas");
-            canvas.width = w;
-            canvas.height = h;
-
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0, w, h);
-
-            const dataUrl = canvas.toDataURL("image/jpeg", quality);
-
-            URL.revokeObjectURL(url);
-            resolve({ dataUrl, width: w, height: h });
-          } catch (e) {
-            URL.revokeObjectURL(url);
-            reject(e);
-          }
-        };
-
-        img.onerror = (e) => {
-          URL.revokeObjectURL(url);
-          reject(e);
-        };
-
-        img.src = url;
-      });
-    }
   </script>
 </body>
 </html>
