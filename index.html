@@ -1,7 +1,3 @@
-<!-- === PART 1 START: HTML/CSS and body up to <script> ===
-     Содержит DOCTYPE, head, стили и HTML-структуру страницы.
-     Этот блок НЕ модифицирован, кроме добавления метки части.
--->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -22,7 +18,6 @@
             color: #fff;
         }
         
-        /* Логотип */
         .logo-container {
             position: fixed;
             top: 15px;
@@ -51,7 +46,6 @@
             color: #f39c12;
         }
         
-        /* Экран входа */
         .login-screen {
             display: flex;
             justify-content: center;
@@ -113,7 +107,6 @@
             color: #888;
         }
         
-        /* Кнопки */
         .btn {
             padding: 12px 24px;
             border: none;
@@ -163,7 +156,6 @@
             font-size: 14px;
         }
         
-        /* Главный экран */
         .main-screen {
             display: none;
             padding: 20px;
@@ -193,7 +185,6 @@
             gap: 10px;
         }
         
-        /* Форма */
         .form-section {
             background: rgba(255,255,255,0.08);
             backdrop-filter: blur(10px);
@@ -217,7 +208,6 @@
             margin-left: auto;
         }
         
-        /* Таблица */
         .table-container {
             overflow-x: auto;
             margin-bottom: 20px;
@@ -291,7 +281,6 @@
             color: #fff;
         }
         
-        /* Блок ответственного */
         .responsible-section {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -307,7 +296,6 @@
             margin-top: 20px;
         }
         
-        /* Модальные окна */
         .modal {
             display: none;
             position: fixed;
@@ -352,7 +340,6 @@
             opacity: 1;
         }
         
-        /* Фильтры */
         .filters {
             display: flex;
             gap: 15px;
@@ -387,7 +374,6 @@
             background: #1a1a2e;
         }
         
-        /* Настройки */
         .settings-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -432,7 +418,6 @@
             font-size: 16px;
         }
         
-        /* Уведомления */
         .notification {
             position: fixed;
             top: 20px;
@@ -458,7 +443,6 @@
             to { transform: translateX(0); opacity: 1; }
         }
         
-        /* Загрузка */
         .loading {
             display: none;
             position: fixed;
@@ -485,7 +469,6 @@
             to { transform: rotate(360deg); }
         }
         
-        /* Адаптив */
         @media (max-width: 768px) {
             .main-screen {
                 padding: 15px;
@@ -539,6 +522,7 @@
             <button class="btn btn-primary" onclick="login()">Войти</button>
         </div>
     </div>
+
     <!-- ГЛАВНЫЙ ЭКРАН -->
     <div class="main-screen" id="mainScreen">
         <div class="header">
@@ -673,7 +657,7 @@
                 </div>
                 
                 <div class="settings-section">
-                    <h3>�icing Производители</h3>
+                    <h3>🏭 Производители</h3>
                     <div class="settings-list" id="manufacturersList"></div>
                     <div style="display:flex; gap:10px;">
                         <input type="text" id="newManufacturer" placeholder="Новый производитель" maxlength="30" style="flex:1; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff;">
@@ -687,494 +671,478 @@
             </div>
         </div>
     </div>
-<!-- === PART 1 END === -->
-<script>
-/* === PART 2 START: JavaScript (весь <script> содержимое) ===
-   Изменения:
-   - Добавлен bangkokFormatter и formatToBangkok()
-   - updateDateTime() теперь показывает время в Asia/Bangkok (UTC+7)
-   - renderHistory() использует formatToBangkok для поля date, если оно парсится
-   Остальной код сохранён без изменений.
-*/
 
-        // === НАСТРОЙКИ ===
-        var API_URL = 'https://script.google.com/macros/s/AKfycbzldfCbJkJ6AZfzy40Ezu4_nRRZPr5ryJLZZLnImIsuDkrBGFwLK-mbUZaqOPJoXiyT/exec';
+    <script>
+    // === НАСТРОЙКИ ===
+    var API_URL = 'https://script.google.com/macros/s/AKfycbzldfCbJkJ6AZfzy40Ezu4_nRRZPr5ryJLZZLnImIsuDkrBGFwLK-mbUZaqOPJoXiyT/exec';
+    
+    var currentPassword = '';
+    var isAdmin = false;
+    var settings = {
+        departments: [],
+        locations: [],
+        powers: [],
+        speeds: [],
+        manufacturers: []
+    };
+    
+    var MAX_LENGTH = 30;
+    var INV_LENGTH = 5;
+
+    // === ФОРМАТИРОВАНИЕ ДАТЫ В UTC+7 (Asia/Bangkok) ===
+    var bangkokFormatter;
+    try {
+        bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
+            timeZone: 'Asia/Bangkok',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        // Fallback для старых браузеров
+        bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    // Безопасное форматирование даты в UTC+7
+    function formatToBangkok(dateInput) {
+        if (!dateInput && dateInput !== 0) return '';
+        var d;
+        if (dateInput instanceof Date) {
+            d = dateInput;
+        } else {
+            d = new Date(dateInput);
+        }
+        if (isNaN(d.getTime())) {
+            // Не удалось распарсить — возвращаем как есть
+            return String(dateInput);
+        }
+        return bangkokFormatter.format(d);
+    }
+    
+    // === ИНИЦИАЛИЗАЦИЯ ===
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') login();
+        });
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
+    });
+    
+    function updateDateTime() {
+        // Текущее время в UTC+7
+        var now = new Date();
+        document.getElementById('currentDateTime').textContent = formatToBangkok(now);
+    }
+    
+    // === ЗАГРУЗКА ===
+    function showLoading() {
+        document.getElementById('loading').style.display = 'flex';
+    }
+    
+    function hideLoading() {
+        document.getElementById('loading').style.display = 'none';
+    }
+    
+    // === УВЕДОМЛЕНИЯ ===
+    function showNotification(message, type) {
+        var existing = document.querySelector('.notification');
+        if (existing) existing.remove();
         
-        var currentPassword = '';
-        var isAdmin = false;
-        var settings = {
-            departments: [],
-            locations: [],
-            powers: [],
-            speeds: [],
-            manufacturers: []
+        var div = document.createElement('div');
+        div.className = 'notification ' + type;
+        div.textContent = message;
+        document.body.appendChild(div);
+        
+        setTimeout(function() { div.remove(); }, 4000);
+    }
+    
+    // === ВХОД ===
+    function login() {
+        var password = document.getElementById('password').value.trim();
+        
+        if (!password) {
+            showNotification('Введите пароль', 'error');
+            return;
+        }
+        
+        showLoading();
+        
+        var url = API_URL + '?action=getSettings&password=' + encodeURIComponent(password);
+        
+        fetch(url)
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                hideLoading();
+                
+                if (!result.success) {
+                    showNotification(result.error || 'Неверный пароль', 'error');
+                    return;
+                }
+                
+                currentPassword = password;
+                isAdmin = result.isAdmin || false;
+                settings = {
+                    departments: result.departments || [],
+                    locations: result.locations || [],
+                    powers: result.powers || [],
+                    speeds: result.speeds || [],
+                    manufacturers: result.manufacturers || []
+                };
+                
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainScreen').style.display = 'block';
+                document.getElementById('logoContainer').style.display = 'flex';
+                
+                if (isAdmin) {
+                    document.getElementById('settingsBtn').style.display = 'inline-flex';
+                }
+                
+                initForm();
+                showNotification('Добро пожаловать!', 'success');
+            })
+            .catch(function(error) {
+                hideLoading();
+                showNotification('Ошибка подключения: ' + error.message, 'error');
+            });
+    }
+    
+    // === ВЫХОД ===
+    function logout() {
+        currentPassword = '';
+        isAdmin = false;
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('mainScreen').style.display = 'none';
+        document.getElementById('logoContainer').style.display = 'none';
+        document.getElementById('settingsBtn').style.display = 'none';
+        document.getElementById('password').value = '';
+    }
+    
+    // === ИНИЦИАЛИЗАЦИЯ ФОРМЫ ===
+    function initForm() {
+        document.getElementById('itemsTable').innerHTML = '';
+        addRow();
+        document.getElementById('responsible').value = '';
+        document.getElementById('phone').value = '';
+    }
+    
+    // === СОЗДАНИЕ SELECT ===
+    function createSelect(options, placeholder) {
+        var html = '<select><option value="">' + placeholder + '</option>';
+        for (var i = 0; i < options.length; i++) {
+            html += '<option value="' + options[i] + '">' + options[i] + '</option>';
+        }
+        html += '</select>';
+        return html;
+    }
+    
+    // === ДОБАВЛЕНИЕ СТРОКИ ===
+    function addRow() {
+        var tbody = document.getElementById('itemsTable');
+        var rowNum = tbody.children.length + 1;
+        
+        var tr = document.createElement('tr');
+        tr.innerHTML = 
+            '<td class="col-num">' + rowNum + '</td>' +
+            '<td class="col-dept">' + createSelect(settings.departments, 'Выберите...') + '</td>' +
+            '<td class="col-loc">' + createSelect(settings.locations, 'Выберите...') + '</td>' +
+            '<td class="col-motor"><input type="text" placeholder="Марка" maxlength="' + MAX_LENGTH + '"></td>' +
+            '<td class="col-inv"><input type="text" placeholder="00000" maxlength="' + INV_LENGTH + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g,\'\')"></td>' +
+            '<td class="col-manuf">' + createSelect(settings.manufacturers, 'Выберите...') + '</td>' +
+            '<td class="col-power">' + createSelect(settings.powers, 'кВт') + '</td>' +
+            '<td class="col-speed">' + createSelect(settings.speeds, 'Об/мин') + '</td>' +
+            '<td class="col-reason"><input type="text" placeholder="Причина" maxlength="' + MAX_LENGTH + '"></td>' +
+            '<td class="col-del"><button class="btn-delete-row" onclick="deleteRow(this)">×</button></td>';
+        tbody.appendChild(tr);
+    }
+    
+    // === УДАЛЕНИЕ СТРОКИ ===
+    function deleteRow(btn) {
+        var tbody = document.getElementById('itemsTable');
+        if (tbody.children.length <= 1) {
+            showNotification('Должна остаться хотя бы одна строка', 'error');
+            return;
+        }
+        btn.closest('tr').remove();
+        renumberRows();
+    }
+    
+    function renumberRows() {
+        var rows = document.querySelectorAll('#itemsTable tr');
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].cells[0].textContent = i + 1;
+        }
+    }
+    
+    // === ОЧИСТКА ФОРМЫ ===
+    function clearForm() {
+        if (confirm('Очистить все поля формы?')) {
+            initForm();
+            showNotification('Форма очищена', 'success');
+        }
+    }
+    
+    // === ОТПРАВКА ЗАЯВКИ ===
+    function submitForm() {
+        var responsible = document.getElementById('responsible').value.trim();
+        var phone = document.getElementById('phone').value.trim();
+        
+        if (!responsible) {
+            showNotification('Укажите ФИО ответственного', 'error');
+            return;
+        }
+        
+        if (!phone) {
+            showNotification('Укажите контактный телефон', 'error');
+            return;
+        }
+        
+        var rows = document.querySelectorAll('#itemsTable tr');
+        var items = [];
+        
+        for (var i = 0; i < rows.length; i++) {
+            var cells = rows[i].cells;
+            var motor = cells[3].querySelector('input').value.trim();
+            
+            if (!motor) continue;
+            
+            var department = cells[1].querySelector('select').value;
+            var location = cells[2].querySelector('select').value;
+            var invNumber = cells[4].querySelector('input').value.trim().toUpperCase();
+            var manufacturer = cells[5].querySelector('select').value;
+            var power = cells[6].querySelector('select').value;
+            var speed = cells[7].querySelector('select').value;
+            var reason = cells[8].querySelector('input').value.trim();
+            
+            if (!department) { showNotification('Строка ' + (i+1) + ': выберите подразделение', 'error'); return; }
+            if (!location) { showNotification('Строка ' + (i+1) + ': выберите место', 'error'); return; }
+            if (!manufacturer) { showNotification('Строка ' + (i+1) + ': выберите производителя', 'error'); return; }
+            if (!power) { showNotification('Строка ' + (i+1) + ': выберите мощность', 'error'); return; }
+            if (!speed) { showNotification('Строка ' + (i+1) + ': выберите обороты', 'error'); return; }
+            
+            items.push({
+                department: department,
+                location: location,
+                motor: motor,
+                invNumber: invNumber,
+                manufacturer: manufacturer,
+                power: power,
+                speed: speed,
+                reason: reason
+            });
+        }
+        
+        if (items.length === 0) {
+            showNotification('Заполните данные хотя бы одного двигателя', 'error');
+            return;
+        }
+        
+        showLoading();
+        
+        var data = {
+            responsible: responsible,
+            phone: phone,
+            items: items
         };
         
-        var MAX_LENGTH = 30;
-        var INV_LENGTH = 5;
-
-        // === Форматирование для Asia/Bangkok (UTC+7) ===
-        // Создаём один форматтер и переиспользуем его
-        var bangkokFormatter;
-        try {
-            bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
-                timeZone: 'Asia/Bangkok',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (e) {
-            // В редком случае, если timeZone не поддержана, fallback на локальный форматтер
-            bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        // Безопасная функция: принимает Date или строку, возвращает форматированную строку в Asia/Bangkok
-        function formatToBangkok(dateInput) {
-            if (!dateInput && dateInput !== 0) return '';
-            var d;
-            if (dateInput instanceof Date) {
-                d = dateInput;
-            } else {
-                // Попытка корректно распарсить строку
-                d = new Date(dateInput);
-            }
-            if (isNaN(d.getTime())) {
-                // Если не удалось распарсить, возвращаем исходное значение (или пустую строку)
-                return dateInput || '';
-            }
-            return bangkokFormatter.format(d);
-        }
+        var url = API_URL + '?action=submit&password=' + encodeURIComponent(currentPassword) + '&data=' + encodeURIComponent(JSON.stringify(data));
         
-        // === ИНИЦИАЛИЗАЦИЯ ===
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('password').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') login();
-            });
-            updateDateTime();
-            setInterval(updateDateTime, 60000);
-        });
-        
-        function updateDateTime() {
-            // Показываем текущую дату/время в зоне Asia/Bangkok (UTC+7)
-            var now = new Date();
-            document.getElementById('currentDateTime').textContent = formatToBangkok(now);
-        }
-        
-        // === ЗАГРУЗКА ===
-        function showLoading() {
-            document.getElementById('loading').style.display = 'flex';
-        }
-        
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-        }
-        
-        // === УВЕДОМЛЕНИЯ ===
-        function showNotification(message, type) {
-            var existing = document.querySelector('.notification');
-            if (existing) existing.remove();
-            
-            var div = document.createElement('div');
-            div.className = 'notification ' + type;
-            div.textContent = message;
-            document.body.appendChild(div);
-            
-            setTimeout(function() { div.remove(); }, 4000);
-        }
-        
-        // === ВХОД ===
-        function login() {
-            var password = document.getElementById('password').value.trim();
-            
-            if (!password) {
-                showNotification('Введите пароль', 'error');
-                return;
-            }
-            
-            showLoading();
-            
-            var url = API_URL + '?action=getSettings&password=' + encodeURIComponent(password);
-            
-            fetch(url)
-                .then(function(response) { return response.json(); })
-                .then(function(result) {
-                    hideLoading();
-                    
-                    if (!result.success) {
-                        showNotification(result.error || 'Неверный пароль', 'error');
-                        return;
-                    }
-                    
-                    currentPassword = password;
-                    isAdmin = result.isAdmin || false;
-                    settings = {
-                        departments: result.departments || [],
-                        locations: result.locations || [],
-                        powers: result.powers || [],
-                        speeds: result.speeds || [],
-                        manufacturers: result.manufacturers || []
-                    };
-                    
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('mainScreen').style.display = 'block';
-                    document.getElementById('logoContainer').style.display = 'flex';
-                    
-                    if (isAdmin) {
-                        document.getElementById('settingsBtn').style.display = 'inline-flex';
-                    }
-                    
+        fetch(url)
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                hideLoading();
+                if (result.success) {
+                    showNotification('✓ Заявка ' + result.applicationNumber + ' сохранена! Записей: ' + result.count, 'success');
                     initForm();
-                    showNotification('Добро пожаловать!', 'success');
-                })
-                .catch(function(error) {
-                    hideLoading();
-                    showNotification('Ошибка подключения: ' + error.message, 'error');
-                });
-        }
-        
-        // === ВЫХОД ===
-        function logout() {
-            currentPassword = '';
-            isAdmin = false;
-            document.getElementById('loginScreen').style.display = 'flex';
-            document.getElementById('mainScreen').style.display = 'none';
-            document.getElementById('logoContainer').style.display = 'none';
-            document.getElementById('settingsBtn').style.display = 'none';
-            document.getElementById('password').value = '';
-        }
-        
-        // === ИНИЦИАЛИЗАЦИЯ ФОРМЫ ===
-        function initForm() {
-            document.getElementById('itemsTable').innerHTML = '';
-            addRow();
-            document.getElementById('responsible').value = '';
-            document.getElementById('phone').value = '';
-        }
-        
-        // === СОЗДАНИЕ SELECT ===
-        function createSelect(options, placeholder) {
-            var html = '<select><option value="">' + placeholder + '</option>';
-            for (var i = 0; i < options.length; i++) {
-                html += '<option value="' + options[i] + '">' + options[i] + '</option>';
-            }
-            html += '</select>';
-            return html;
-        }
-        
-        // === ДОБАВЛЕНИЕ СТРОКИ ===
-        function addRow() {
-            var tbody = document.getElementById('itemsTable');
-            var rowNum = tbody.children.length + 1;
-            
-            var tr = document.createElement('tr');
-            tr.innerHTML = 
-                '<td class="col-num">' + rowNum + '</td>' +
-                '<td class="col-dept">' + createSelect(settings.departments, 'Выберите...') + '</td>' +
-                '<td class="col-loc">' + createSelect(settings.locations, 'Выберите...') + '</td>' +
-                '<td class="col-motor"><input type="text" placeholder="Марка" maxlength="' + MAX_LENGTH + '"></td>' +
-                '<td class="col-inv"><input type="text" placeholder="00000" maxlength="' + INV_LENGTH + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g,\'\')"></td>' +
-                '<td class="col-manuf">' + createSelect(settings.manufacturers, 'Выберите...') + '</td>' +
-                '<td class="col-power">' + createSelect(settings.powers, 'кВт') + '</td>' +
-                '<td class="col-speed">' + createSelect(settings.speeds, 'Об/мин') + '</td>' +
-                '<td class="col-reason"><input type="text" placeholder="Причина" maxlength="' + MAX_LENGTH + '"></td>' +
-                '<td class="col-del"><button class="btn-delete-row" onclick="deleteRow(this)">×</button></td>';
-            tbody.appendChild(tr);
-        }
-        
-        // === УДАЛЕНИЕ СТРОКИ ===
-        function deleteRow(btn) {
-            var tbody = document.getElementById('itemsTable');
-            if (tbody.children.length <= 1) {
-                showNotification('Должна остаться хотя бы одна строка', 'error');
-                return;
-            }
-            btn.closest('tr').remove();
-            renumberRows();
-        }
-        
-        function renumberRows() {
-            var rows = document.querySelectorAll('#itemsTable tr');
-            for (var i = 0; i < rows.length; i++) {
-                rows[i].cells[0].textContent = i + 1;
-            }
-        }
-        
-        // === ОЧИСТКА ФОРМЫ ===
-        function clearForm() {
-            if (confirm('Очистить все поля формы?')) {
-                initForm();
-                showNotification('Форма очищена', 'success');
-            }
-        }
-        
-        // === ОТПРАВКА ЗАЯВКИ (через GET для обхода CORS) ===
-        function submitForm() {
-            var responsible = document.getElementById('responsible').value.trim();
-            var phone = document.getElementById('phone').value.trim();
-            
-            if (!responsible) {
-                showNotification('Укажите ФИО ответственного', 'error');
-                return;
-            }
-            
-            if (!phone) {
-                showNotification('Укажите контактный телефон', 'error');
-                return;
-            }
-            
-            var rows = document.querySelectorAll('#itemsTable tr');
-            var items = [];
-            
-            for (var i = 0; i < rows.length; i++) {
-                var cells = rows[i].cells;
-                var motor = cells[3].querySelector('input').value.trim();
-                
-                if (!motor) continue;
-                
-                var department = cells[1].querySelector('select').value;
-                var location = cells[2].querySelector('select').value;
-                var invNumber = cells[4].querySelector('input').value.trim().toUpperCase();
-                var manufacturer = cells[5].querySelector('select').value;
-                var power = cells[6].querySelector('select').value;
-                var speed = cells[7].querySelector('select').value;
-                var reason = cells[8].querySelector('input').value.trim();
-                
-                if (!department) { showNotification('Строка ' + (i+1) + ': выберите подразделение', 'error'); return; }
-                if (!location) { showNotification('Строка ' + (i+1) + ': выберите место', 'error'); return; }
-                if (!manufacturer) { showNotification('Строка ' + (i+1) + ': выберите производителя', 'error'); return; }
-                if (!power) { showNotification('Строка ' + (i+1) + ': выберите мощность', 'error'); return; }
-                if (!speed) { showNotification('Строка ' + (i+1) + ': выберите обороты', 'error'); return; }
-                
-                items.push({
-                    department: department,
-                    location: location,
-                    motor: motor,
-                    invNumber: invNumber,
-                    manufacturer: manufacturer,
-                    power: power,
-                    speed: speed,
-                    reason: reason
-                });
-            }
-            
-            if (items.length === 0) {
-                showNotification('Заполните данные хотя бы одного двигателя', 'error');
-                return;
-            }
-            
-            showLoading();
-            
-            var data = {
-                responsible: responsible,
-                phone: phone,
-                items: items
-            };
-            
-            var url = API_URL + '?action=submit&password=' + encodeURIComponent(currentPassword) + '&data=' + encodeURIComponent(JSON.stringify(data));
-            
-            fetch(url)
-                .then(function(response) { return response.json(); })
-                .then(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        showNotification('✓ Заявка ' + result.applicationNumber + ' сохранена! Записей: ' + result.count, 'success');
-                        initForm();
-                    } else {
-                        showNotification(result.error || 'Ошибка сохранения', 'error');
-                    }
-                })
-                .catch(function(error) {
-                    hideLoading();
-                    showNotification('Ошибка: ' + error.message, 'error');
-                });
-        }
-        
-        // === ИСТОРИЯ ===
-        function showHistory() {
-            document.getElementById('historyModal').style.display = 'flex';
-            fillFilter('filterDepartment', settings.departments, 'Все');
-            fillFilter('filterLocation', settings.locations, 'Все');
-            fillFilter('filterPower', settings.powers, 'Любая');
-            loadHistory();
-        }
-        
-        function closeHistory() {
-            document.getElementById('historyModal').style.display = 'none';
-        }
-        
-        function fillFilter(id, options, placeholder) {
-            var select = document.getElementById(id);
-            select.innerHTML = '<option value="">' + placeholder + '</option>';
-            for (var i = 0; i < options.length; i++) {
-                select.innerHTML += '<option value="' + options[i] + '">' + options[i] + '</option>';
-            }
-        }
-        
-        function loadHistory() {
-            var department = document.getElementById('filterDepartment').value;
-            var location = document.getElementById('filterLocation').value;
-            var power = document.getElementById('filterPower').value;
-            var invNumber = document.getElementById('filterInvNumber').value.trim();
-            
-            showLoading();
-            
-            var url = API_URL + '?action=getHistory&password=' + encodeURIComponent(currentPassword);
-            if (department) url += '&department=' + encodeURIComponent(department);
-            if (location) url += '&location=' + encodeURIComponent(location);
-            if (power) url += '&power=' + encodeURIComponent(power);
-            if (invNumber) url += '&invNumber=' + encodeURIComponent(invNumber);
-            
-            fetch(url)
-                .then(function(response) { return response.json(); })
-                .then(function(result) {
-                    hideLoading();
-                    if (result.success) {
-                        renderHistory(result.data);
-                    } else {
-                        showNotification(result.error || 'Ошибка загрузки', 'error');
-                    }
-                })
-                .catch(function(error) {
-                    hideLoading();
-                    showNotification('Ошибка: ' + error.message, 'error');
-                });
-        }
-        
-        function renderHistory(data) {
-            var tbody = document.getElementById('historyTable');
-            
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#888;">Заявки не найдены</td></tr>';
-                return;
-            }
-            
-            var html = '';
-            for (var i = 0; i < data.length; i++) {
-                var r = data[i];
-                var dateStr = r.date || '';
-                // Пытаемся отформатировать дату в Asia/Bangkok (если она парсится), иначе показываем как есть
-                var dateFormatted = dateStr ? formatToBangkok(dateStr) : '';
-                html += '<tr>' +
-                    '<td>' + (r.number || '') + '</td>' +
-                    '<td>' + (dateFormatted || '') + '</td>' +
-                    '<td>' + (r.department || '') + '</td>' +
-                    '<td>' + (r.location || '') + '</td>' +
-                    '<td>' + (r.motor || '') + '</td>' +
-                    '<td>' + (r.invNumber || '') + '</td>' +
-                    '<td>' + (r.manufacturer || '') + '</td>' +
-                    '<td>' + (r.power || '') + '</td>' +
-                    '<td>' + (r.speed || '') + '</td>' +
-                    '<td>' + (r.reason || '') + '</td>' +
-                    '<td>' + (r.responsible || '') + '</td>' +
-                    '<td>' + (r.phone || '') + '</td>' +
-                    '</tr>';
-            }
-            tbody.innerHTML = html;
-        }
-        
-        // === НАСТРОЙКИ ===
-        function showSettings() {
-            document.getElementById('settingsModal').style.display = 'flex';
-            renderSettingsList('departmentsList', settings.departments);
-            renderSettingsList('locationsList', settings.locations);
-            renderSettingsList('manufacturersList', settings.manufacturers);
-        }
-        
-        function closeSettings() {
-            document.getElementById('settingsModal').style.display = 'none';
-        }
-        
-        function renderSettingsList(containerId, items) {
-            var container = document.getElementById(containerId);
-            var html = '';
-            for (var i = 0; i < items.length; i++) {
-                var item = items[i];
-                var escaped = item.replace(/'/g, "\\'");
-                html += '<div class="settings-item"><span>' + item + '</span><button onclick="removeItem(\'' + containerId + '\',\'' + escaped + '\')">×</button></div>';
-            }
-            container.innerHTML = html;
-        }
-        
-        function removeItem(containerId, item) {
-            if (containerId === 'departmentsList') {
-                settings.departments = settings.departments.filter(function(d) { return d !== item; });
-                renderSettingsList(containerId, settings.departments);
-            } else if (containerId === 'locationsList') {
-                settings.locations = settings.locations.filter(function(l) { return l !== item; });
-                renderSettingsList(containerId, settings.locations);
-            } else if (containerId === 'manufacturersList') {
-                settings.manufacturers = settings.manufacturers.filter(function(m) { return m !== item; });
-                renderSettingsList(containerId, settings.manufacturers);
-            }
-        }
-        
-        function addDepartment() {
-            var input = document.getElementById('newDepartment');
-            var value = input.value.trim();
-            if (value && settings.departments.indexOf(value) === -1) {
-                settings.departments.push(value);
-                renderSettingsList('departmentsList', settings.departments);
-                input.value = '';
-            }
-        }
-        
-        function addLocation() {
-            var input = document.getElementById('newLocation');
-            var value = input.value.trim();
-            if (value && settings.locations.indexOf(value) === -1) {
-                settings.locations.push(value);
-                renderSettingsList('locationsList', settings.locations);
-                input.value = '';
-            }
-        }
-        
-        function addManufacturer() {
-            var input = document.getElementById('newManufacturer');
-            var value = input.value.trim();
-            if (value && settings.manufacturers.indexOf(value) === -1) {
-                settings.manufacturers.push(value);
-                renderSettingsList('manufacturersList', settings.manufacturers);
-                input.value = '';
-            }
-        }
-        
-        function saveSettings() {
-            showLoading();
-            
-            var saved = 0;
-            var total = 3;
-            
-            function checkDone() {
-                saved++;
-                if (saved >= total) {
-                    hideLoading();
-                    showNotification('Настройки сохранены!', 'success');
-                    closeSettings();
+                } else {
+                    showNotification(result.error || 'Ошибка сохранения', 'error');
                 }
-            }
-            
-            // Сохраняем подразделения
-            var url1 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=departments&items=' + encodeURIComponent(JSON.stringify(settings.departments));
-            fetch(url1).then(checkDone).catch(checkDone);
-            
-            // Сохраняем места
-            var url2 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=locations&items=' + encodeURIComponent(JSON.stringify(settings.locations));
-            fetch(url2).then(checkDone).catch(checkDone);
-            
-            // Сохраняем производителей
-            var url3 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=manufacturers&items=' + encodeURIComponent(JSON.stringify(settings.manufacturers));
-            fetch(url3).then(checkDone).catch(checkDone);
+            })
+            .catch(function(error) {
+                hideLoading();
+                showNotification('Ошибка: ' + error.message, 'error');
+            });
+    }
+    
+    // === ИСТОРИЯ ===
+    function showHistory() {
+        document.getElementById('historyModal').style.display = 'flex';
+        fillFilter('filterDepartment', settings.departments, 'Все');
+        fillFilter('filterLocation', settings.locations, 'Все');
+        fillFilter('filterPower', settings.powers, 'Любая');
+        loadHistory();
+    }
+    
+    function closeHistory() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+    
+    function fillFilter(id, options, placeholder) {
+        var select = document.getElementById(id);
+        select.innerHTML = '<option value="">' + placeholder + '</option>';
+        for (var i = 0; i < options.length; i++) {
+            select.innerHTML += '<option value="' + options[i] + '">' + options[i] + '</option>';
         }
-
-/* === PART 2 END === */
-</script>
+    }
+    
+    function loadHistory() {
+        var department = document.getElementById('filterDepartment').value;
+        var location = document.getElementById('filterLocation').value;
+        var power = document.getElementById('filterPower').value;
+        var invNumber = document.getElementById('filterInvNumber').value.trim();
+        
+        showLoading();
+        
+        var url = API_URL + '?action=getHistory&password=' + encodeURIComponent(currentPassword);
+        if (department) url += '&department=' + encodeURIComponent(department);
+        if (location) url += '&location=' + encodeURIComponent(location);
+        if (power) url += '&power=' + encodeURIComponent(power);
+        if (invNumber) url += '&invNumber=' + encodeURIComponent(invNumber);
+        
+        fetch(url)
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                hideLoading();
+                if (result.success) {
+                    renderHistory(result.data);
+                } else {
+                    showNotification(result.error || 'Ошибка загрузки', 'error');
+                }
+            })
+            .catch(function(error) {
+                hideLoading();
+                showNotification('Ошибка: ' + error.message, 'error');
+            });
+    }
+    
+    function renderHistory(data) {
+        var tbody = document.getElementById('historyTable');
+        
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#888;">Заявки не найдены</td></tr>';
+            return;
+        }
+        
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+            var r = data[i];
+            // Форматируем дату в UTC+7 (если парсится)
+            var dateFormatted = r.date ? formatToBangkok(r.date) : '';
+            html += '<tr>' +
+                '<td>' + (r.number || '') + '</td>' +
+                '<td>' + dateFormatted + '</td>' +
+                '<td>' + (r.department || '') + '</td>' +
+                '<td>' + (r.location || '') + '</td>' +
+                '<td>' + (r.motor || '') + '</td>' +
+                '<td>' + (r.invNumber || '') + '</td>' +
+                '<td>' + (r.manufacturer || '') + '</td>' +
+                '<td>' + (r.power || '') + '</td>' +
+                '<td>' + (r.speed || '') + '</td>' +
+                '<td>' + (r.reason || '') + '</td>' +
+                '<td>' + (r.responsible || '') + '</td>' +
+                '<td>' + (r.phone || '') + '</td>' +
+                '</tr>';
+        }
+        tbody.innerHTML = html;
+    }
+    
+    // === НАСТРОЙКИ ===
+    function showSettings() {
+        document.getElementById('settingsModal').style.display = 'flex';
+        renderSettingsList('departmentsList', settings.departments);
+        renderSettingsList('locationsList', settings.locations);
+        renderSettingsList('manufacturersList', settings.manufacturers);
+    }
+    
+    function closeSettings() {
+        document.getElementById('settingsModal').style.display = 'none';
+    }
+    
+    function renderSettingsList(containerId, items) {
+        var container = document.getElementById(containerId);
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var escaped = item.replace(/'/g, "\\'");
+            html += '<div class="settings-item"><span>' + item + '</span><button onclick="removeItem(\'' + containerId + '\',\'' + escaped + '\')">×</button></div>';
+        }
+        container.innerHTML = html;
+    }
+    
+    function removeItem(containerId, item) {
+        if (containerId === 'departmentsList') {
+            settings.departments = settings.departments.filter(function(d) { return d !== item; });
+            renderSettingsList(containerId, settings.departments);
+        } else if (containerId === 'locationsList') {
+            settings.locations = settings.locations.filter(function(l) { return l !== item; });
+            renderSettingsList(containerId, settings.locations);
+        } else if (containerId === 'manufacturersList') {
+            settings.manufacturers = settings.manufacturers.filter(function(m) { return m !== item; });
+            renderSettingsList(containerId, settings.manufacturers);
+        }
+    }
+    
+    function addDepartment() {
+        var input = document.getElementById('newDepartment');
+        var value = input.value.trim();
+        if (value && settings.departments.indexOf(value) === -1) {
+            settings.departments.push(value);
+            renderSettingsList('departmentsList', settings.departments);
+            input.value = '';
+        }
+    }
+    
+    function addLocation() {
+        var input = document.getElementById('newLocation');
+        var value = input.value.trim();
+        if (value && settings.locations.indexOf(value) === -1) {
+            settings.locations.push(value);
+            renderSettingsList('locationsList', settings.locations);
+            input.value = '';
+        }
+    }
+    
+    function addManufacturer() {
+        var input = document.getElementById('newManufacturer');
+        var value = input.value.trim();
+        if (value && settings.manufacturers.indexOf(value) === -1) {
+            settings.manufacturers.push(value);
+            renderSettingsList('manufacturersList', settings.manufacturers);
+            input.value = '';
+        }
+    }
+    
+    function saveSettings() {
+        showLoading();
+        
+        var saved = 0;
+        var total = 3;
+        
+        function checkDone() {
+            saved++;
+            if (saved >= total) {
+                hideLoading();
+                showNotification('Настройки сохранены!', 'success');
+                closeSettings();
+            }
+        }
+        
+        var url1 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=departments&items=' + encodeURIComponent(JSON.stringify(settings.departments));
+        fetch(url1).then(checkDone).catch(checkDone);
+        
+        var url2 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=locations&items=' + encodeURIComponent(JSON.stringify(settings.locations));
+        fetch(url2).then(checkDone).catch(checkDone);
+        
+        var url3 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=manufacturers&items=' + encodeURIComponent(JSON.stringify(settings.manufacturers));
+        fetch(url3).then(checkDone).catch(checkDone);
+    }
+    </script>
 </body>
 </html>
