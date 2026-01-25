@@ -1,239 +1,1180 @@
+<!-- === PART 1 START: HTML/CSS and body up to <script> ===
+     Содержит DOCTYPE, head, стили и HTML-структуру страницы.
+     Этот блок НЕ модифицирован, кроме добавления метки части.
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Загрузка фото</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-
-    .container {
-      background: white;
-      padding: 40px;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      max-width: 520px;
-      width: 100%;
-    }
-
-    .company-name {
-      color: #dc143c;
-      font-size: 20px;
-      font-weight: bold;
-      line-height: 1.4;
-      margin-bottom: 15px;
-      text-align: center;
-    }
-
-    h1 {
-      color: #333;
-      margin-bottom: 16px;
-      text-align: center;
-      font-size: 28px;
-    }
-
-    .upload-area {
-      border: 3px dashed #667eea;
-      border-radius: 15px;
-      padding: 40px;
-      text-align: center;
-      background: #f8f9ff;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .upload-area:hover {
-      background: #e8ebff;
-      border-color: #764ba2;
-    }
-
-    .upload-icon { font-size: 60px; margin-bottom: 20px; }
-    .upload-text { color: #666; font-size: 18px; margin-bottom: 10px; }
-    .upload-hint { color: #999; font-size: 14px; }
-
-    input[type="file"] { display: none; }
-
-    .preview { margin-top: 22px; text-align: center; }
-    .preview img {
-      max-width: 100%;
-      max-height: 380px;
-      border-radius: 10px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    }
-
-    .button-group {
-      margin-top: 22px;
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-    }
-
-    .btn {
-      padding: 14px 26px;
-      font-size: 16px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: bold;
-    }
-
-    .btn-send { background: #4CAF50; color: white; }
-    .btn-send:hover { background: #45a049; transform: translateY(-1px); }
-    .btn-send:disabled { background: #cccccc; cursor: not-allowed; transform: none; }
-
-    .btn-cancel { background: #f44336; color: white; }
-    .btn-cancel:hover { background: #da190b; transform: translateY(-1px); }
-
-    #status {
-      margin-top: 18px;
-      padding: 14px;
-      border-radius: 10px;
-      text-align: center;
-      font-weight: bold;
-      display: none;
-      word-break: break-word;
-    }
-
-    .status-success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
-    .status-error   { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
-    .status-loading { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
-
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
-      border-radius: 50%;
-      width: 34px;
-      height: 34px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto;
-    }
-
-    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заявки на ремонт электродвигателей</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        /* Логотип */
+        .logo-container {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+        }
+        
+        .logo-text {
+            font-size: 14px;
+            font-weight: bold;
+            color: #f39c12;
+        }
+        
+        /* Экран входа */
+        .login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .login-box {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .login-box h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .login-box p {
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #ddd;
+        }
+        
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #f39c12;
+        }
+        
+        .input-group input::placeholder {
+            color: #888;
+        }
+        
+        /* Кнопки */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+            color: #fff;
+            width: 100%;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: #fff;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+            color: #fff;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        
+        /* Главный экран */
+        .main-screen {
+            display: none;
+            padding: 20px;
+            padding-left: 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Форма */
+        .form-section {
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .form-section h2 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .datetime {
+            font-size: 14px;
+            color: #aaa;
+            font-weight: normal;
+            margin-left: auto;
+        }
+        
+        /* Таблица */
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1100px;
+        }
+        
+        th, td {
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th {
+            background: rgba(255,255,255,0.1);
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        
+        td select,
+        td input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        td select:focus,
+        td input:focus {
+            outline: none;
+            border-color: #f39c12;
+        }
+        
+        td select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        
+        .col-num { width: 40px; text-align: center; }
+        .col-dept { width: 150px; }
+        .col-loc { width: 130px; }
+        .col-motor { width: 120px; }
+        .col-inv { width: 80px; }
+        .col-manuf { width: 100px; }
+        .col-power { width: 70px; }
+        .col-speed { width: 80px; }
+        .col-reason { width: 130px; }
+        .col-del { width: 40px; }
+        
+        .btn-delete-row {
+            background: rgba(231, 76, 60, 0.2);
+            border: none;
+            color: #e74c3c;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-delete-row:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+        
+        /* Блок ответственного */
+        .responsible-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .form-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        /* Модальные окна */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 15px;
+            padding: 25px;
+            width: 100%;
+            max-width: 1200px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        
+        .modal-close:hover {
+            opacity: 1;
+        }
+        
+        /* Фильтры */
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .filter-group label {
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            font-size: 14px;
+            min-width: 140px;
+        }
+        
+        .filter-group select option {
+            background: #1a1a2e;
+        }
+        
+        /* Настройки */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .settings-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .settings-section h3 {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .settings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .settings-item button {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        /* Уведомления */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: 500;
+            z-index: 3000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .notification.success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+        
+        .notification.error {
+            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Загрузка */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 4000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: #f39c12;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Адаптив */
+        @media (max-width: 768px) {
+            .main-screen {
+                padding: 15px;
+                padding-top: 70px;
+            }
+            
+            .logo-container {
+                top: 10px;
+                left: 10px;
+            }
+            
+            .logo {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .logo-text {
+                display: none;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .header h1 {
+                font-size: 18px;
+            }
+        }
+    </style>
 </head>
-
 <body>
-  <div class="container">
-    <div class="company-name">
-      Ремонт электродвигателей<br>
-      АО "Новосибирская птицефабрика"
+    <div class="logo-container" id="logoContainer">
+        <div class="logo">⚡</div>
+        <span class="logo-text">РЕМОНТ ЭД</span>
     </div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- ЭКРАН ВХОДА -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <h1>⚡ Вход в систему</h1>
+            <p>Заявки на ремонт электродвигателей</p>
+            <div class="input-group">
+                <label>Пароль:</label>
+                <input type="password" id="password" placeholder="Введите пароль">
+            </div>
+            <button class="btn btn-primary" onclick="login()">Войти</button>
+        </div>
+    </div>
+    <!-- ГЛАВНЫЙ ЭКРАН -->
+    <div class="main-screen" id="mainScreen">
+        <div class="header">
+            <h1>⚡ Заявка на ремонт электродвигателей</h1>
+            <div class="header-buttons">
+                <button class="btn btn-secondary" onclick="showHistory()">📋 История</button>
+                <button class="btn btn-secondary" id="settingsBtn" style="display:none;" onclick="showSettings()">⚙ Настройки</button>
+                <button class="btn btn-secondary" onclick="logout()">🚪 Выход</button>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h2>📝 Новая заявка <span class="datetime" id="currentDateTime"></span></h2>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-num">№</th>
+                            <th class="col-dept">Подразделение</th>
+                            <th class="col-loc">Место установки</th>
+                            <th class="col-motor">Электродвигатель</th>
+                            <th class="col-inv">Инв. №</th>
+                            <th class="col-manuf">Производитель</th>
+                            <th class="col-power">кВт</th>
+                            <th class="col-speed">Об/мин</th>
+                            <th class="col-reason">Причина ремонта</th>
+                            <th class="col-del"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTable"></tbody>
+                </table>
+            </div>
+            
+            <button class="btn btn-secondary btn-small" onclick="addRow()">+ Добавить строку</button>
+            
+            <div class="responsible-section">
+                <div class="input-group">
+                    <label>ФИО ответственного:</label>
+                    <input type="text" id="responsible" placeholder="Иванов Иван Иванович" maxlength="50">
+                </div>
+                <div class="input-group">
+                    <label>Контактный телефон:</label>
+                    <input type="text" id="phone" placeholder="+7 (999) 123-45-67" maxlength="20">
+                </div>
+            </div>
+            
+            <div class="form-buttons">
+                <button class="btn btn-danger" onclick="clearForm()">🗑 Очистить</button>
+                <button class="btn btn-success" onclick="submitForm()">💾 Сохранить заявку</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- МОДАЛЬНОЕ ОКНО: ИСТОРИЯ -->
+    <div class="modal" id="historyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📋 История заявок</h2>
+                <button class="modal-close" onclick="closeHistory()">&times;</button>
+            </div>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Подразделение:</label>
+                    <select id="filterDepartment"></select>
+                </div>
+                <div class="filter-group">
+                    <label>Место установки:</label>
+                    <select id="filterLocation"></select>
+                </div>
+                <div class="filter-group">
+                    <label>Мощность:</label>
+                    <select id="filterPower"></select>
+                </div>
+                <div class="filter-group">
+                    <label>Инв. номер:</label>
+                    <input type="text" id="filterInvNumber" placeholder="Поиск..." maxlength="5">
+                </div>
+                <button class="btn btn-primary btn-small" onclick="loadHistory()">🔍 Найти</button>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>№ заявки</th>
+                            <th>Дата</th>
+                            <th>Подразделение</th>
+                            <th>Место</th>
+                            <th>Двигатель</th>
+                            <th>Инв. №</th>
+                            <th>Производ.</th>
+                            <th>кВт</th>
+                            <th>Об/мин</th>
+                            <th>Причина</th>
+                            <th>Ответственный</th>
+                            <th>Телефон</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- МОДАЛЬНОЕ ОКНО: НАСТРОЙКИ -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙ Настройки справочников</h2>
+                <button class="modal-close" onclick="closeSettings()">&times;</button>
+            </div>
+            
+            <div class="settings-grid">
+                <div class="settings-section">
+                    <h3>🏭 Подразделения</h3>
+                    <div class="settings-list" id="departmentsList"></div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="newDepartment" placeholder="Новое подразделение" maxlength="30" style="flex:1; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff;">
+                        <button class="btn btn-success btn-small" onclick="addDepartment()">+</button>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>📍 Места установки</h3>
+                    <div class="settings-list" id="locationsList"></div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="newLocation" placeholder="Новое место" maxlength="30" style="flex:1; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff;">
+                        <button class="btn btn-success btn-small" onclick="addLocation()">+</button>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>�icing Производители</h3>
+                    <div class="settings-list" id="manufacturersList"></div>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="newManufacturer" placeholder="Новый производитель" maxlength="30" style="flex:1; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff;">
+                        <button class="btn btn-success btn-small" onclick="addManufacturer()">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn btn-success" onclick="saveSettings()">💾 Сохранить настройки</button>
+            </div>
+        </div>
+    </div>
+<!-- === PART 1 END === -->
+<script>
+/* === PART 2 START: JavaScript (весь <script> содержимое) ===
+   Изменения:
+   - Добавлен bangkokFormatter и formatToBangkok()
+   - updateDateTime() теперь показывает время в Asia/Bangkok (UTC+7)
+   - renderHistory() использует formatToBangkok для поля date, если оно парсится
+   Остальной код сохранён без изменений.
+*/
 
-    <h1>Загрузите фото</h1>
+        // === НАСТРОЙКИ ===
+        var API_URL = 'https://script.google.com/macros/s/AKfycbzldfCbJkJ6AZfzy40Ezu4_nRRZPr5ryJLZZLnImIsuDkrBGFwLK-mbUZaqOPJoXiyT/exec';
+        
+        var currentPassword = '';
+        var isAdmin = false;
+        var settings = {
+            departments: [],
+            locations: [],
+            powers: [],
+            speeds: [],
+            manufacturers: []
+        };
+        
+        var MAX_LENGTH = 30;
+        var INV_LENGTH = 5;
 
-    <form id="photoForm">
-      <label for="photo" class="upload-area" id="uploadArea">
-        <div class="upload-icon">📷</div>
-        <div class="upload-text">Нажмите для выбора фото</div>
-        <div class="upload-hint">или сделайте снимок камерой</div>
-      </label>
-
-      <input type="file" id="photo" name="photo" accept="image/*" capture="environment" required>
-
-      <div class="preview" id="preview"></div>
-
-      <div class="button-group" id="buttonGroup" style="display:none;">
-        <button type="submit" class="btn btn-send" id="sendBtn">Отправить фото</button>
-        <button type="button" class="btn btn-cancel" id="cancelBtn">Отменить</button>
-      </div>
-    </form>
-
-    <div id="status"></div>
-  </div>
-
-  <script>
-    const WORKER_URL = "https://tg-photo-proxy.jazogm.workers.dev";
-    const MAX_MB = 20; // лимит на клиенте, чтобы не слать совсем огромные файлы
-
-    const photoInput = document.getElementById("photo");
-    const preview = document.getElementById("preview");
-    const buttonGroup = document.getElementById("buttonGroup");
-    const form = document.getElementById("photoForm");
-    const status = document.getElementById("status");
-    const cancelBtn = document.getElementById("cancelBtn");
-    const sendBtn = document.getElementById("sendBtn");
-
-    let selectedFile = null;
-
-    function showStatus(message, type) {
-      status.innerHTML = message;
-      status.className = `status-${type}`;
-      status.style.display = "block";
-    }
-
-    function resetAll() {
-      form.reset();
-      preview.innerHTML = "";
-      buttonGroup.style.display = "none";
-      status.style.display = "none";
-      selectedFile = null;
-      sendBtn.disabled = false;
-    }
-
-    cancelBtn.addEventListener("click", resetAll);
-
-    photoInput.addEventListener("change", () => {
-      const file = photoInput.files && photoInput.files[0];
-      if (!file) return;
-
-      if (file.size > MAX_MB * 1024 * 1024) {
-        showStatus(`❌ Файл слишком большой. Максимум ${MAX_MB} МБ`, "error");
-        return;
-      }
-
-      selectedFile = file;
-
-      const url = URL.createObjectURL(file);
-      preview.innerHTML = `<img src="${url}" alt="preview">`;
-      buttonGroup.style.display = "flex";
-      showStatus("Фото выбрано. Нажмите «Отправить фото».", "success");
-    });
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      if (!selectedFile) {
-        showStatus("❌ Выберите фото.", "error");
-        return;
-      }
-
-      sendBtn.disabled = true;
-      buttonGroup.style.display = "none";
-      showStatus('<div class="spinner"></div><div style="margin-top:10px;">Отправка в Telegram...</div>', "loading");
-
-      try {
-        const fd = new FormData();
-        fd.append("photo", selectedFile, selectedFile.name || "photo.jpg");
-        fd.append("caption", `Фото с сайта. Файл: ${selectedFile.name || "photo.jpg"}`);
-
-        const res = await fetch(WORKER_URL, { method: "POST", body: fd });
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok || !data.ok) {
-          throw new Error(data.error || "Ошибка отправки (Worker/Telegram)");
+        // === Форматирование для Asia/Bangkok (UTC+7) ===
+        // Создаём один форматтер и переиспользуем его
+        var bangkokFormatter;
+        try {
+            bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
+                timeZone: 'Asia/Bangkok',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            // В редком случае, если timeZone не поддержана, fallback на локальный форматтер
+            bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
         }
 
-        showStatus("✅ Отправлено в Telegram!", "success");
-        setTimeout(resetAll, 2000);
-      } catch (err) {
-        console.error(err);
-        showStatus("❌ Ошибка отправки. Проверьте интернет и попробуйте ещё раз.", "error");
-        buttonGroup.style.display = "flex";
-        sendBtn.disabled = false;
-      }
-    });
-  </script>
+        // Безопасная функция: принимает Date или строку, возвращает форматированную строку в Asia/Bangkok
+        function formatToBangkok(dateInput) {
+            if (!dateInput && dateInput !== 0) return '';
+            var d;
+            if (dateInput instanceof Date) {
+                d = dateInput;
+            } else {
+                // Попытка корректно распарсить строку
+                d = new Date(dateInput);
+            }
+            if (isNaN(d.getTime())) {
+                // Если не удалось распарсить, возвращаем исходное значение (или пустую строку)
+                return dateInput || '';
+            }
+            return bangkokFormatter.format(d);
+        }
+        
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') login();
+            });
+            updateDateTime();
+            setInterval(updateDateTime, 60000);
+        });
+        
+        function updateDateTime() {
+            // Показываем текущую дату/время в зоне Asia/Bangkok (UTC+7)
+            var now = new Date();
+            document.getElementById('currentDateTime').textContent = formatToBangkok(now);
+        }
+        
+        // === ЗАГРУЗКА ===
+        function showLoading() {
+            document.getElementById('loading').style.display = 'flex';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // === УВЕДОМЛЕНИЯ ===
+        function showNotification(message, type) {
+            var existing = document.querySelector('.notification');
+            if (existing) existing.remove();
+            
+            var div = document.createElement('div');
+            div.className = 'notification ' + type;
+            div.textContent = message;
+            document.body.appendChild(div);
+            
+            setTimeout(function() { div.remove(); }, 4000);
+        }
+        
+        // === ВХОД ===
+        function login() {
+            var password = document.getElementById('password').value.trim();
+            
+            if (!password) {
+                showNotification('Введите пароль', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            var url = API_URL + '?action=getSettings&password=' + encodeURIComponent(password);
+            
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(result) {
+                    hideLoading();
+                    
+                    if (!result.success) {
+                        showNotification(result.error || 'Неверный пароль', 'error');
+                        return;
+                    }
+                    
+                    currentPassword = password;
+                    isAdmin = result.isAdmin || false;
+                    settings = {
+                        departments: result.departments || [],
+                        locations: result.locations || [],
+                        powers: result.powers || [],
+                        speeds: result.speeds || [],
+                        manufacturers: result.manufacturers || []
+                    };
+                    
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('mainScreen').style.display = 'block';
+                    document.getElementById('logoContainer').style.display = 'flex';
+                    
+                    if (isAdmin) {
+                        document.getElementById('settingsBtn').style.display = 'inline-flex';
+                    }
+                    
+                    initForm();
+                    showNotification('Добро пожаловать!', 'success');
+                })
+                .catch(function(error) {
+                    hideLoading();
+                    showNotification('Ошибка подключения: ' + error.message, 'error');
+                });
+        }
+        
+        // === ВЫХОД ===
+        function logout() {
+            currentPassword = '';
+            isAdmin = false;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainScreen').style.display = 'none';
+            document.getElementById('logoContainer').style.display = 'none';
+            document.getElementById('settingsBtn').style.display = 'none';
+            document.getElementById('password').value = '';
+        }
+        
+        // === ИНИЦИАЛИЗАЦИЯ ФОРМЫ ===
+        function initForm() {
+            document.getElementById('itemsTable').innerHTML = '';
+            addRow();
+            document.getElementById('responsible').value = '';
+            document.getElementById('phone').value = '';
+        }
+        
+        // === СОЗДАНИЕ SELECT ===
+        function createSelect(options, placeholder) {
+            var html = '<select><option value="">' + placeholder + '</option>';
+            for (var i = 0; i < options.length; i++) {
+                html += '<option value="' + options[i] + '">' + options[i] + '</option>';
+            }
+            html += '</select>';
+            return html;
+        }
+        
+        // === ДОБАВЛЕНИЕ СТРОКИ ===
+        function addRow() {
+            var tbody = document.getElementById('itemsTable');
+            var rowNum = tbody.children.length + 1;
+            
+            var tr = document.createElement('tr');
+            tr.innerHTML = 
+                '<td class="col-num">' + rowNum + '</td>' +
+                '<td class="col-dept">' + createSelect(settings.departments, 'Выберите...') + '</td>' +
+                '<td class="col-loc">' + createSelect(settings.locations, 'Выберите...') + '</td>' +
+                '<td class="col-motor"><input type="text" placeholder="Марка" maxlength="' + MAX_LENGTH + '"></td>' +
+                '<td class="col-inv"><input type="text" placeholder="00000" maxlength="' + INV_LENGTH + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZА-Я0-9]/g,\'\')"></td>' +
+                '<td class="col-manuf">' + createSelect(settings.manufacturers, 'Выберите...') + '</td>' +
+                '<td class="col-power">' + createSelect(settings.powers, 'кВт') + '</td>' +
+                '<td class="col-speed">' + createSelect(settings.speeds, 'Об/мин') + '</td>' +
+                '<td class="col-reason"><input type="text" placeholder="Причина" maxlength="' + MAX_LENGTH + '"></td>' +
+                '<td class="col-del"><button class="btn-delete-row" onclick="deleteRow(this)">×</button></td>';
+            tbody.appendChild(tr);
+        }
+        
+        // === УДАЛЕНИЕ СТРОКИ ===
+        function deleteRow(btn) {
+            var tbody = document.getElementById('itemsTable');
+            if (tbody.children.length <= 1) {
+                showNotification('Должна остаться хотя бы одна строка', 'error');
+                return;
+            }
+            btn.closest('tr').remove();
+            renumberRows();
+        }
+        
+        function renumberRows() {
+            var rows = document.querySelectorAll('#itemsTable tr');
+            for (var i = 0; i < rows.length; i++) {
+                rows[i].cells[0].textContent = i + 1;
+            }
+        }
+        
+        // === ОЧИСТКА ФОРМЫ ===
+        function clearForm() {
+            if (confirm('Очистить все поля формы?')) {
+                initForm();
+                showNotification('Форма очищена', 'success');
+            }
+        }
+        
+        // === ОТПРАВКА ЗАЯВКИ (через GET для обхода CORS) ===
+        function submitForm() {
+            var responsible = document.getElementById('responsible').value.trim();
+            var phone = document.getElementById('phone').value.trim();
+            
+            if (!responsible) {
+                showNotification('Укажите ФИО ответственного', 'error');
+                return;
+            }
+            
+            if (!phone) {
+                showNotification('Укажите контактный телефон', 'error');
+                return;
+            }
+            
+            var rows = document.querySelectorAll('#itemsTable tr');
+            var items = [];
+            
+            for (var i = 0; i < rows.length; i++) {
+                var cells = rows[i].cells;
+                var motor = cells[3].querySelector('input').value.trim();
+                
+                if (!motor) continue;
+                
+                var department = cells[1].querySelector('select').value;
+                var location = cells[2].querySelector('select').value;
+                var invNumber = cells[4].querySelector('input').value.trim().toUpperCase();
+                var manufacturer = cells[5].querySelector('select').value;
+                var power = cells[6].querySelector('select').value;
+                var speed = cells[7].querySelector('select').value;
+                var reason = cells[8].querySelector('input').value.trim();
+                
+                if (!department) { showNotification('Строка ' + (i+1) + ': выберите подразделение', 'error'); return; }
+                if (!location) { showNotification('Строка ' + (i+1) + ': выберите место', 'error'); return; }
+                if (!manufacturer) { showNotification('Строка ' + (i+1) + ': выберите производителя', 'error'); return; }
+                if (!power) { showNotification('Строка ' + (i+1) + ': выберите мощность', 'error'); return; }
+                if (!speed) { showNotification('Строка ' + (i+1) + ': выберите обороты', 'error'); return; }
+                
+                items.push({
+                    department: department,
+                    location: location,
+                    motor: motor,
+                    invNumber: invNumber,
+                    manufacturer: manufacturer,
+                    power: power,
+                    speed: speed,
+                    reason: reason
+                });
+            }
+            
+            if (items.length === 0) {
+                showNotification('Заполните данные хотя бы одного двигателя', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            var data = {
+                responsible: responsible,
+                phone: phone,
+                items: items
+            };
+            
+            var url = API_URL + '?action=submit&password=' + encodeURIComponent(currentPassword) + '&data=' + encodeURIComponent(JSON.stringify(data));
+            
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showNotification('✓ Заявка ' + result.applicationNumber + ' сохранена! Записей: ' + result.count, 'success');
+                        initForm();
+                    } else {
+                        showNotification(result.error || 'Ошибка сохранения', 'error');
+                    }
+                })
+                .catch(function(error) {
+                    hideLoading();
+                    showNotification('Ошибка: ' + error.message, 'error');
+                });
+        }
+        
+        // === ИСТОРИЯ ===
+        function showHistory() {
+            document.getElementById('historyModal').style.display = 'flex';
+            fillFilter('filterDepartment', settings.departments, 'Все');
+            fillFilter('filterLocation', settings.locations, 'Все');
+            fillFilter('filterPower', settings.powers, 'Любая');
+            loadHistory();
+        }
+        
+        function closeHistory() {
+            document.getElementById('historyModal').style.display = 'none';
+        }
+        
+        function fillFilter(id, options, placeholder) {
+            var select = document.getElementById(id);
+            select.innerHTML = '<option value="">' + placeholder + '</option>';
+            for (var i = 0; i < options.length; i++) {
+                select.innerHTML += '<option value="' + options[i] + '">' + options[i] + '</option>';
+            }
+        }
+        
+        function loadHistory() {
+            var department = document.getElementById('filterDepartment').value;
+            var location = document.getElementById('filterLocation').value;
+            var power = document.getElementById('filterPower').value;
+            var invNumber = document.getElementById('filterInvNumber').value.trim();
+            
+            showLoading();
+            
+            var url = API_URL + '?action=getHistory&password=' + encodeURIComponent(currentPassword);
+            if (department) url += '&department=' + encodeURIComponent(department);
+            if (location) url += '&location=' + encodeURIComponent(location);
+            if (power) url += '&power=' + encodeURIComponent(power);
+            if (invNumber) url += '&invNumber=' + encodeURIComponent(invNumber);
+            
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        renderHistory(result.data);
+                    } else {
+                        showNotification(result.error || 'Ошибка загрузки', 'error');
+                    }
+                })
+                .catch(function(error) {
+                    hideLoading();
+                    showNotification('Ошибка: ' + error.message, 'error');
+                });
+        }
+        
+        function renderHistory(data) {
+            var tbody = document.getElementById('historyTable');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#888;">Заявки не найдены</td></tr>';
+                return;
+            }
+            
+            var html = '';
+            for (var i = 0; i < data.length; i++) {
+                var r = data[i];
+                var dateStr = r.date || '';
+                // Пытаемся отформатировать дату в Asia/Bangkok (если она парсится), иначе показываем как есть
+                var dateFormatted = dateStr ? formatToBangkok(dateStr) : '';
+                html += '<tr>' +
+                    '<td>' + (r.number || '') + '</td>' +
+                    '<td>' + (dateFormatted || '') + '</td>' +
+                    '<td>' + (r.department || '') + '</td>' +
+                    '<td>' + (r.location || '') + '</td>' +
+                    '<td>' + (r.motor || '') + '</td>' +
+                    '<td>' + (r.invNumber || '') + '</td>' +
+                    '<td>' + (r.manufacturer || '') + '</td>' +
+                    '<td>' + (r.power || '') + '</td>' +
+                    '<td>' + (r.speed || '') + '</td>' +
+                    '<td>' + (r.reason || '') + '</td>' +
+                    '<td>' + (r.responsible || '') + '</td>' +
+                    '<td>' + (r.phone || '') + '</td>' +
+                    '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+        
+        // === НАСТРОЙКИ ===
+        function showSettings() {
+            document.getElementById('settingsModal').style.display = 'flex';
+            renderSettingsList('departmentsList', settings.departments);
+            renderSettingsList('locationsList', settings.locations);
+            renderSettingsList('manufacturersList', settings.manufacturers);
+        }
+        
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+        
+        function renderSettingsList(containerId, items) {
+            var container = document.getElementById(containerId);
+            var html = '';
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var escaped = item.replace(/'/g, "\\'");
+                html += '<div class="settings-item"><span>' + item + '</span><button onclick="removeItem(\'' + containerId + '\',\'' + escaped + '\')">×</button></div>';
+            }
+            container.innerHTML = html;
+        }
+        
+        function removeItem(containerId, item) {
+            if (containerId === 'departmentsList') {
+                settings.departments = settings.departments.filter(function(d) { return d !== item; });
+                renderSettingsList(containerId, settings.departments);
+            } else if (containerId === 'locationsList') {
+                settings.locations = settings.locations.filter(function(l) { return l !== item; });
+                renderSettingsList(containerId, settings.locations);
+            } else if (containerId === 'manufacturersList') {
+                settings.manufacturers = settings.manufacturers.filter(function(m) { return m !== item; });
+                renderSettingsList(containerId, settings.manufacturers);
+            }
+        }
+        
+        function addDepartment() {
+            var input = document.getElementById('newDepartment');
+            var value = input.value.trim();
+            if (value && settings.departments.indexOf(value) === -1) {
+                settings.departments.push(value);
+                renderSettingsList('departmentsList', settings.departments);
+                input.value = '';
+            }
+        }
+        
+        function addLocation() {
+            var input = document.getElementById('newLocation');
+            var value = input.value.trim();
+            if (value && settings.locations.indexOf(value) === -1) {
+                settings.locations.push(value);
+                renderSettingsList('locationsList', settings.locations);
+                input.value = '';
+            }
+        }
+        
+        function addManufacturer() {
+            var input = document.getElementById('newManufacturer');
+            var value = input.value.trim();
+            if (value && settings.manufacturers.indexOf(value) === -1) {
+                settings.manufacturers.push(value);
+                renderSettingsList('manufacturersList', settings.manufacturers);
+                input.value = '';
+            }
+        }
+        
+        function saveSettings() {
+            showLoading();
+            
+            var saved = 0;
+            var total = 3;
+            
+            function checkDone() {
+                saved++;
+                if (saved >= total) {
+                    hideLoading();
+                    showNotification('Настройки сохранены!', 'success');
+                    closeSettings();
+                }
+            }
+            
+            // Сохраняем подразделения
+            var url1 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=departments&items=' + encodeURIComponent(JSON.stringify(settings.departments));
+            fetch(url1).then(checkDone).catch(checkDone);
+            
+            // Сохраняем места
+            var url2 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=locations&items=' + encodeURIComponent(JSON.stringify(settings.locations));
+            fetch(url2).then(checkDone).catch(checkDone);
+            
+            // Сохраняем производителей
+            var url3 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=manufacturers&items=' + encodeURIComponent(JSON.stringify(settings.manufacturers));
+            fetch(url3).then(checkDone).catch(checkDone);
+        }
+
+/* === PART 2 END === */
+</script>
 </body>
 </html>
-
