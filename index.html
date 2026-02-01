@@ -1,7 +1,8 @@
-<!-- === PART 1 START: HTML/CSS and body up to <script> ===
-     Содержит DOCTYPE, head, стили и HTML-структуру страницы.
-     В эту часть добавлена кнопка "🖨 Печать" в заголовке модального окна История.
--->
+<!-- ============================================================
+     ЧАСТЬ 1 из 3: DOCTYPE, HEAD, CSS-СТИЛИ
+     Содержит: структуру документа, метатеги, все стили оформления
+     Строки: 1-280
+     ============================================================ -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -163,7 +164,6 @@
             font-size: 14px;
         }
 
-        /* Дополнительный стиль для кнопки печати в модальном заголовке */
         .modal-print {
             display: inline-flex;
             align-items: center;
@@ -348,9 +348,9 @@
         }
         
         .modal-header h2 {
-            display:flex;
-            align-items:center;
-            gap:8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .modal-close {
@@ -457,6 +457,7 @@
             font-weight: 500;
             z-index: 3000;
             animation: slideIn 0.3s ease;
+            max-width: 400px;
         }
         
         .notification.success {
@@ -465,6 +466,10 @@
         
         .notification.error {
             background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+        }
+        
+        .notification.warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
         }
         
         @keyframes slideIn {
@@ -531,12 +536,23 @@
         }
     </style>
 </head>
+<!-- ============================================================
+     КОНЕЦ ЧАСТИ 1 из 3
+     Следующая часть: HTML-разметка (body)
+     ============================================================ -->
+<!-- ============================================================
+     ЧАСТЬ 2 из 3: HTML-РАЗМЕТКА (BODY)
+     Содержит: логотип, экран входа, главный экран, модальные окна
+     Строки: 281-460
+     ============================================================ -->
 <body>
+    <!-- Логотип в углу -->
     <div class="logo-container" id="logoContainer">
         <div class="logo">⚡</div>
         <span class="logo-text">РЕМОНТ ЭД</span>
     </div>
     
+    <!-- Индикатор загрузки -->
     <div class="loading" id="loading">
         <div class="spinner"></div>
     </div>
@@ -553,6 +569,7 @@
             <button class="btn btn-primary" onclick="login()">Войти</button>
         </div>
     </div>
+    
     <!-- ГЛАВНЫЙ ЭКРАН -->
     <div class="main-screen" id="mainScreen">
         <div class="header">
@@ -612,7 +629,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>📋 История заявок</h2>
-                <!-- Добавлена кнопка печати -->
                 <div style="display:flex; gap:8px; align-items:center;">
                     <button class="btn btn-secondary btn-small modal-print" onclick="printHistory()">🖨 Печать</button>
                     <button class="modal-close" onclick="closeHistory()">&times;</button>
@@ -705,13 +721,22 @@
             </div>
         </div>
     </div>
-<!-- === PART 1 END === -->
-<!-- === PART 2 START: JavaScript (весь <script> содержимое) ===
-     Содержит всю логику: форматирование даты в UTC+7, загрузку/рендер истории и новая функция printHistory(),
-     которая формирует печатную страницу с таблицей истории и вызывает окно печати.
--->
+<!-- ============================================================
+     КОНЕЦ ЧАСТИ 2 из 3
+     Следующая часть: JavaScript (весь функционал)
+     ВАЖНО: Тег </body> и </html> будут в конце Части 3
+     ============================================================ -->
+<!-- ============================================================
+     ЧАСТЬ 3 из 3: JAVASCRIPT (ВЕСЬ ФУНКЦИОНАЛ)
+     Содержит: настройки, буфер данных, авторизация, формы,
+               история, печать, настройки справочников
+     Строки: 461-850
+     ============================================================ -->
 <script>
-    // === НАСТРОЙКИ ===
+    // ============================================================
+    // БЛОК 1: ГЛОБАЛЬНЫЕ НАСТРОЙКИ И ПЕРЕМЕННЫЕ
+    // ============================================================
+    
     var API_URL = 'https://script.google.com/macros/s/AKfycbzldfCbJkJ6AZfzy40Ezu4_nRRZPr5ryJLZZLnImIsuDkrBGFwLK-mbUZaqOPJoXiyT/exec';
     
     var currentPassword = '';
@@ -726,8 +751,192 @@
     
     var MAX_LENGTH = 30;
     var INV_LENGTH = 5;
+    var BUFFER_EXPIRY_HOURS = 24;
 
-    // === Форматирование для Asia/Bangkok (UTC+7) ===
+    // ============================================================
+    // БЛОК 2: СИСТЕМА БУФЕРА ДАННЫХ (sessionStorage + таймер 24ч)
+    // ============================================================
+    
+    /**
+     * Сохраняет данные формы в буфер перед отправкой
+     * Буфер живёт до закрытия браузера ИЛИ 24 часа (что раньше)
+     */
+    function saveToBuffer() {
+        try {
+            var formData = collectFormData();
+            if (!formData) return false;
+            
+            var bufferData = {
+                timestamp: new Date().toISOString(),
+                responsible: formData.responsible,
+                phone: formData.phone,
+                items: formData.items
+            };
+            
+            sessionStorage.setItem('pendingRequest', JSON.stringify(bufferData));
+            return true;
+        } catch (e) {
+            console.warn('Ошибка сохранения в буфер:', e);
+            return false;
+        }
+    }
+    
+    /**
+     * Собирает данные из формы (без валидации обязательных полей)
+     * Возвращает объект с данными или null если форма пуста
+     */
+    function collectFormData() {
+        var responsible = document.getElementById('responsible').value.trim();
+        var phone = document.getElementById('phone').value.trim();
+        
+        var rows = document.querySelectorAll('#itemsTable tr');
+        var items = [];
+        
+        for (var i = 0; i < rows.length; i++) {
+            var cells = rows[i].cells;
+            var item = {
+                department: cells[1].querySelector('select').value,
+                location: cells[2].querySelector('select').value,
+                motor: cells[3].querySelector('input').value.trim(),
+                invNumber: cells[4].querySelector('input').value.trim().toUpperCase(),
+                manufacturer: cells[5].querySelector('select').value,
+                power: cells[6].querySelector('select').value,
+                speed: cells[7].querySelector('select').value,
+                reason: cells[8].querySelector('input').value.trim()
+            };
+            items.push(item);
+        }
+        
+        // Проверяем, есть ли хоть какие-то данные
+        var hasData = responsible || phone || items.some(function(item) {
+            return item.motor || item.department || item.location;
+        });
+        
+        if (!hasData) return null;
+        
+        return {
+            responsible: responsible,
+            phone: phone,
+            items: items
+        };
+    }
+    
+    /**
+     * Проверяет наличие данных в буфере и их актуальность
+     * Возвращает данные или null
+     */
+    function getBufferData() {
+        try {
+            var stored = sessionStorage.getItem('pendingRequest');
+            if (!stored) return null;
+            
+            var bufferData = JSON.parse(stored);
+            
+            // Проверяем срок годности (24 часа)
+            var savedTime = new Date(bufferData.timestamp).getTime();
+            var now = new Date().getTime();
+            var hoursPassed = (now - savedTime) / (1000 * 60 * 60);
+            
+            if (hoursPassed > BUFFER_EXPIRY_HOURS) {
+                clearBuffer();
+                return null;
+            }
+            
+            return bufferData;
+        } catch (e) {
+            console.warn('Ошибка чтения буфера:', e);
+            return null;
+        }
+    }
+    
+    /**
+     * Очищает буфер данных
+     */
+    function clearBuffer() {
+        try {
+            sessionStorage.removeItem('pendingRequest');
+        } catch (e) {
+            console.warn('Ошибка очистки буфера:', e);
+        }
+    }
+    
+    /**
+     * Проверяет буфер при входе и предлагает восстановить данные
+     */
+    function checkAndRestoreBuffer() {
+        var bufferData = getBufferData();
+        
+        if (!bufferData) return;
+        
+        // Проверяем, есть ли реальные данные для восстановления
+        var hasItems = bufferData.items && bufferData.items.some(function(item) {
+            return item.motor || item.department;
+        });
+        var hasResponsible = bufferData.responsible || bufferData.phone;
+        
+        if (!hasItems && !hasResponsible) {
+            clearBuffer();
+            return;
+        }
+        
+        // Формируем время сохранения для отображения
+        var savedTime = new Date(bufferData.timestamp);
+        var timeStr = savedTime.toLocaleString('ru-RU');
+        
+        var confirmMsg = 'Обнаружены несохранённые данные от ' + timeStr + '.\n\n' +
+                         'Восстановить предыдущую заявку?\n\n' +
+                         '• ОК - восстановить данные\n' +
+                         '• Отмена - начать с чистой формы';
+        
+        if (confirm(confirmMsg)) {
+            restoreFromBuffer(bufferData);
+            showNotification('Данные восстановлены из буфера', 'success');
+        } else {
+            clearBuffer();
+        }
+    }
+    
+    /**
+     * Восстанавливает данные из буфера в форму
+     */
+    function restoreFromBuffer(bufferData) {
+        // Очищаем текущую таблицу
+        document.getElementById('itemsTable').innerHTML = '';
+        
+        // Восстанавливаем строки
+        if (bufferData.items && bufferData.items.length > 0) {
+            for (var i = 0; i < bufferData.items.length; i++) {
+                addRow();
+            }
+            
+            // Заполняем данные
+            var rows = document.querySelectorAll('#itemsTable tr');
+            for (var i = 0; i < rows.length && i < bufferData.items.length; i++) {
+                var cells = rows[i].cells;
+                var item = bufferData.items[i];
+                
+                cells[1].querySelector('select').value = item.department || '';
+                cells[2].querySelector('select').value = item.location || '';
+                cells[3].querySelector('input').value = item.motor || '';
+                cells[4].querySelector('input').value = item.invNumber || '';
+                cells[5].querySelector('select').value = item.manufacturer || '';
+                cells[6].querySelector('select').value = item.power || '';
+                cells[7].querySelector('select').value = item.speed || '';
+                cells[8].querySelector('input').value = item.reason || '';
+            }
+        } else {
+            addRow();
+        }
+        
+        // Восстанавливаем ответственного
+        document.getElementById('responsible').value = bufferData.responsible || '';
+        document.getElementById('phone').value = bufferData.phone || '';
+    }
+
+    // ============================================================
+    // БЛОК 3: ФОРМАТИРОВАНИЕ ДАТЫ И ВРЕМЕНИ
+    // ============================================================
+    
     var bangkokFormatter;
     try {
         bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -739,7 +948,6 @@
             minute: '2-digit'
         });
     } catch (e) {
-        // В редком случае, если timeZone не поддержана, fallback на локальный форматтер
         bangkokFormatter = new Intl.DateTimeFormat('ru-RU', {
             day: '2-digit',
             month: '2-digit',
@@ -749,24 +957,21 @@
         });
     }
 
-    // Безопасная функция: принимает Date или строку, возвращает форматированную строку в Asia/Bangkok
     function formatToBangkok(dateInput) {
         if (!dateInput && dateInput !== 0) return '';
-        var d;
-        if (dateInput instanceof Date) {
-            d = dateInput;
-        } else {
-            // Попытка корректно распарсить строку
-            d = new Date(dateInput);
-        }
-        if (isNaN(d.getTime())) {
-            // Если не удалось распарсить, возвращаем исходное значение (или пустую строку)
-            return dateInput || '';
-        }
+        var d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+        if (isNaN(d.getTime())) return dateInput || '';
         return bangkokFormatter.format(d);
     }
     
-    // === ИНИЦИАЛИЗАЦИЯ ===
+    function updateDateTime() {
+        document.getElementById('currentDateTime').textContent = formatToBangkok(new Date());
+    }
+
+    // ============================================================
+    // БЛОК 4: ИНИЦИАЛИЗАЦИЯ И ЗАГРУЗКА
+    // ============================================================
+    
     document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') login();
@@ -775,13 +980,6 @@
         setInterval(updateDateTime, 60000);
     });
     
-    function updateDateTime() {
-        // Показываем текущую дату/время в зоне Asia/Bangkok (UTC+7)
-        var now = new Date();
-        document.getElementById('currentDateTime').textContent = formatToBangkok(now);
-    }
-    
-    // === ЗАГРУЗКА ===
     function showLoading() {
         document.getElementById('loading').style.display = 'flex';
     }
@@ -789,8 +987,11 @@
     function hideLoading() {
         document.getElementById('loading').style.display = 'none';
     }
+
+    // ============================================================
+    // БЛОК 5: УВЕДОМЛЕНИЯ
+    // ============================================================
     
-    // === УВЕДОМЛЕНИЯ ===
     function showNotification(message, type) {
         var existing = document.querySelector('.notification');
         if (existing) existing.remove();
@@ -800,10 +1001,14 @@
         div.textContent = message;
         document.body.appendChild(div);
         
-        setTimeout(function() { div.remove(); }, 4000);
+        var duration = (type === 'warning') ? 8000 : 4000;
+        setTimeout(function() { div.remove(); }, duration);
     }
+
+    // ============================================================
+    // БЛОК 6: АВТОРИЗАЦИЯ (ВХОД/ВЫХОД)
+    // ============================================================
     
-    // === ВХОД ===
     function login() {
         var password = document.getElementById('password').value.trim();
         
@@ -845,6 +1050,10 @@
                 }
                 
                 initForm();
+                
+                // Проверяем буфер ПОСЛЕ инициализации формы
+                checkAndRestoreBuffer();
+                
                 showNotification('Добро пожаловать!', 'success');
             })
             .catch(function(error) {
@@ -853,7 +1062,6 @@
             });
     }
     
-    // === ВЫХОД ===
     function logout() {
         currentPassword = '';
         isAdmin = false;
@@ -863,8 +1071,11 @@
         document.getElementById('settingsBtn').style.display = 'none';
         document.getElementById('password').value = '';
     }
+
+    // ============================================================
+    // БЛОК 7: РАБОТА С ФОРМОЙ (ИНИЦИАЛИЗАЦИЯ, СТРОКИ, ОЧИСТКА)
+    // ============================================================
     
-    // === ИНИЦИАЛИЗАЦИЯ ФОРМЫ ===
     function initForm() {
         document.getElementById('itemsTable').innerHTML = '';
         addRow();
@@ -872,7 +1083,6 @@
         document.getElementById('phone').value = '';
     }
     
-    // === СОЗДАНИЕ SELECT ===
     function createSelect(options, placeholder) {
         var html = '<select><option value="">' + placeholder + '</option>';
         for (var i = 0; i < options.length; i++) {
@@ -882,7 +1092,6 @@
         return html;
     }
     
-    // === ДОБАВЛЕНИЕ СТРОКИ ===
     function addRow() {
         var tbody = document.getElementById('itemsTable');
         var rowNum = tbody.children.length + 1;
@@ -902,7 +1111,6 @@
         tbody.appendChild(tr);
     }
     
-    // === УДАЛЕНИЕ СТРОКИ ===
     function deleteRow(btn) {
         var tbody = document.getElementById('itemsTable');
         if (tbody.children.length <= 1) {
@@ -920,15 +1128,18 @@
         }
     }
     
-    // === ОЧИСТКА ФОРМЫ ===
     function clearForm() {
-        if (confirm('Очистить все поля формы?')) {
+        if (confirm('Очистить все поля формы и буфер данных?')) {
+            clearBuffer();
             initForm();
-            showNotification('Форма очищена', 'success');
+            showNotification('Форма и буфер очищены', 'success');
         }
     }
+
+    // ============================================================
+    // БЛОК 8: ОТПРАВКА ЗАЯВКИ (С СОХРАНЕНИЕМ В БУФЕР)
+    // ============================================================
     
-    // === ОТПРАВКА ЗАЯВКИ (через GET для обхода CORS) ===
     function submitForm() {
         var responsible = document.getElementById('responsible').value.trim();
         var phone = document.getElementById('phone').value.trim();
@@ -983,6 +1194,9 @@
             return;
         }
         
+        // СОХРАНЯЕМ В БУФЕР ПЕРЕД ОТПРАВКОЙ
+        saveToBuffer();
+        
         showLoading();
         
         var data = {
@@ -998,19 +1212,26 @@
             .then(function(result) {
                 hideLoading();
                 if (result.success) {
+                    // УСПЕХ: очищаем буфер и форму
+                    clearBuffer();
                     showNotification('✓ Заявка ' + result.applicationNumber + ' сохранена! Записей: ' + result.count, 'success');
                     initForm();
                 } else {
-                    showNotification(result.error || 'Ошибка сохранения', 'error');
+                    // ОШИБКА СЕРВЕРА: буфер сохранён, форма НЕ очищается
+                    showNotification('Ошибка: ' + (result.error || 'Неизвестная ошибка'), 'error');
                 }
             })
             .catch(function(error) {
                 hideLoading();
-                showNotification('Ошибка: ' + error.message, 'error');
+                // ОШИБКА СЕТИ/ТАЙМАУТ: буфер сохранён, форма НЕ очищается
+                showNotification('⚠ Нет ответа сервера. Проверьте Историю. Данные сохранены.', 'warning');
             });
     }
+
+    // ============================================================
+    // БЛОК 9: ИСТОРИЯ ЗАЯВОК
+    // ============================================================
     
-    // === ИСТОРИЯ ===
     function showHistory() {
         document.getElementById('historyModal').style.display = 'flex';
         fillFilter('filterDepartment', settings.departments, 'Все');
@@ -1072,12 +1293,10 @@
         var html = '';
         for (var i = 0; i < data.length; i++) {
             var r = data[i];
-            var dateStr = r.date || '';
-            // Пытаемся отформатировать дату в Asia/Bangkok (если она парсится), иначе показываем как есть
-            var dateFormatted = dateStr ? formatToBangkok(dateStr) : '';
+            var dateFormatted = r.date ? formatToBangkok(r.date) : '';
             html += '<tr>' +
                 '<td>' + (r.number || '') + '</td>' +
-                '<td>' + (dateFormatted || '') + '</td>' +
+                '<td>' + dateFormatted + '</td>' +
                 '<td>' + (r.department || '') + '</td>' +
                 '<td>' + (r.location || '') + '</td>' +
                 '<td>' + (r.motor || '') + '</td>' +
@@ -1093,10 +1312,11 @@
         tbody.innerHTML = html;
     }
 
-    // === НОВАЯ ФУНКЦИЯ: ПЕЧАТЬ ИСТОРИИ ===
-    // Собирает текущую таблицу истории и открывает новое окно с чистой страницей для печати.
+    // ============================================================
+    // БЛОК 10: ПЕЧАТЬ ИСТОРИИ
+    // ============================================================
+    
     function printHistory() {
-        // Сбор метаданных (фильтры)
         var department = document.getElementById('filterDepartment').value;
         var location = document.getElementById('filterLocation').value;
         var power = document.getElementById('filterPower').value;
@@ -1110,72 +1330,56 @@
         if (filtersHtml === '<div style="margin-bottom:12px; font-size:14px;">') filtersHtml += '<em>Фильтры: все</em>';
         filtersHtml += '</div>';
 
-        // Получаем таблицу истории (клонируем заголовок и тело)
         var table = document.querySelector('#historyModal .table-container table');
         if (!table) {
             showNotification('Таблица истории не найдена', 'error');
             return;
         }
 
-        // Используем outerHTML, но удаляем потенциальные интерактивные элементы (скрипты/кнопки) — у нас их нет внутри таблицы, поэтому это безопасно.
         var tableHtml = table.outerHTML;
-
-        // Формируем HTML для печати
         var title = 'История заявок';
         var generatedAt = formatToBangkok(new Date());
-        var printStyles = '\
-            body{font-family:Arial, Helvetica, sans-serif; color:#000; background:#fff; padding:20px;} \
-            h1{font-size:18px; margin-bottom:6px;} \
-            p.meta{font-size:13px; color:#333; margin-bottom:6px;} \
-            table{width:100%; border-collapse:collapse; font-size:12px;} \
-            th,td{border:1px solid #444; padding:6px 8px; text-align:left;} \
-            thead th{background:#eee;} \
-            @media print { button { display:none; } }';
+        
+        var printStyles = 'body{font-family:Arial,sans-serif;color:#000;background:#fff;padding:20px;}' +
+            'h1{font-size:18px;margin-bottom:6px;}' +
+            'p.meta{font-size:13px;color:#333;margin-bottom:6px;}' +
+            'table{width:100%;border-collapse:collapse;font-size:12px;}' +
+            'th,td{border:1px solid #444;padding:6px 8px;text-align:left;}' +
+            'thead th{background:#eee;}';
 
-        var html = '<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(title) + '</title><style>' + printStyles + '</style></head><body>';
-        html += '<h1>' + escapeHtml(title) + '</h1>';
-        html += '<p class="meta">Сформировано: ' + escapeHtml(generatedAt) + ' (GMT+7)</p>';
-        html += filtersHtml;
-        html += tableHtml;
-        html += '</body></html>';
+        var html = '<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(title) + '</title><style>' + printStyles + '</style></head><body>' +
+            '<h1>' + escapeHtml(title) + '</h1>' +
+            '<p class="meta">Сформировано: ' + escapeHtml(generatedAt) + '</p>' +
+            filtersHtml + tableHtml + '</body></html>';
 
-        // Открываем новое окно и печатаем
         var printWindow = window.open('', '_blank');
         if (!printWindow) {
-            showNotification('Браузер заблокировал всплывающее окно печати. Разрешите всплывающие окна и попробуйте снова.', 'error');
+            showNotification('Браузер заблокировал всплывающее окно', 'error');
             return;
         }
         printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
 
-        // Ждём пока содержимое загрузится, затем вызываем печать
-        // Используем небольшой таймаут — обычно достаточно
         setTimeout(function() {
-            try {
-                printWindow.focus();
-                printWindow.print();
-                // Не всегда можно безопасно закрыть окно автоматически — оставляем окно открытым, чтобы пользователь мог увидеть результат.
-                // Если хотите, можно раскомментировать закрытие:
-                // printWindow.close();
-            } catch (e) {
-                showNotification('Не удалось вызвать диалог печати: ' + e.message, 'error');
-            }
+            printWindow.focus();
+            printWindow.print();
         }, 500);
     }
 
-    // Вспомогательная функция: экранирование HTML (чтобы фильтры/текст не ломали страницу)
     function escapeHtml(str) {
         if (str === null || str === undefined) return '';
         return String(str)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+            .replace(/"/g, '&quot;');
     }
 
-    // === НАСТРОЙКИ ===
+    // ============================================================
+    // БЛОК 11: НАСТРОЙКИ СПРАВОЧНИКОВ (ТОЛЬКО ДЛЯ АДМИНА)
+    // ============================================================
+    
     function showSettings() {
         document.getElementById('settingsModal').style.display = 'flex';
         renderSettingsList('departmentsList', settings.departments);
@@ -1256,19 +1460,18 @@
             }
         }
         
-        // Сохраняем подразделения
         var url1 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=departments&items=' + encodeURIComponent(JSON.stringify(settings.departments));
         fetch(url1).then(checkDone).catch(checkDone);
         
-        // Сохраняем места
         var url2 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=locations&items=' + encodeURIComponent(JSON.stringify(settings.locations));
         fetch(url2).then(checkDone).catch(checkDone);
         
-        // Сохраняем производителей
         var url3 = API_URL + '?action=updateList&password=' + encodeURIComponent(currentPassword) + '&listType=manufacturers&items=' + encodeURIComponent(JSON.stringify(settings.manufacturers));
         fetch(url3).then(checkDone).catch(checkDone);
     }
 </script>
-<!-- === PART 2 END === -->
+<!-- ============================================================
+     КОНЕЦ ЧАСТИ 3 из 3
+     ============================================================ -->
 </body>
 </html>
