@@ -830,3 +830,999 @@ body {
         </div>
     </div>
 </div>
+<script>
+// ============================================================
+// КОНФИГУРАЦИЯ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ============================================================
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbwCMXnkBgheVwoTcwkwq85mVAK9KpXJ_o-FNCTJH6p16_ScPFbMfOuSai5AfENC9IOE/exec';
+
+const API_TIMEOUT = 180000; // 3 минуты - для всех запросов
+
+let currentUser = { role: '', department: '', employees: [], password: '' };
+let settings = { units: [], categories: [], departments: [] };
+let currentOrderId = null;
+let positionRowCount = 0;
+
+// ДОБАВЛЕНО: ключ хранения очереди в localStorage
+const QUEUE_STORAGE_KEY = 'pendingRequests';
+
+// ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================
+
+function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+function showToast(message, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = 'toast ' + (type || 'success') + ' active';
+    setTimeout(function() { toast.classList.remove('active'); }, 4000);
+}
+
+function formatDate(date) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
+}
+
+// ============================================================
+// API ЗАПРОСЫ (JSONP) - без изменений
+// ============================================================
+
+function apiRequest(params) {
+    return new Promise(function(resolve) {
+        const callbackName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        const url = new URL(API_URL);
+
+        Object.keys(params).forEach(function(key) {
+            url.searchParams.append(key, params[key]);
+        });
+        url.searchParams.append('callback', callbackName);
+
+        let isResolved = false;
+        let timeoutId = null;
+        let script = null;
+
+        function cleanup() {
+            isResolved = true;
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            try {
+                delete window[callbackName];
+            } catch (e) {
+                window[callbackName] = undefined;
+            }
+            if (script && script.parentNode) {
+                script.parentNode.removeChild(script);
+            }
+        }
+
+        window[callbackName] = function(data) {
+            if (!isResolved) {
+                resolve(data);
+                cleanup();
+            }
+        };
+
+        timeoutId = setTimeout(function() {
+            if (!isResolved) {
+                console.warn('API запрос превысил таймаут (' + (API_TIMEOUT/1000) + ' сек). Действие:', params.action);
+                resolve({
+                    success: false,
+                    error: 'Сервер долго отвечает. Возможно, данные сохранены - проверьте историю заявок.',
+                    timeout: true
+                });
+                cleanup();
+            }
+        }, API_TIMEOUT);
+
+        script = document.createElement('script');
+        script.src = url.toString();
+        script.onerror = function() {
+            if (!isResolved) {
+                resolve({ success: false, error: 'Ошибка соединения с сервером' });
+                cleanup();
+            }
+        };
+        document.head.appendChild(script);
+    });
+}
+
+// ============================================================
+// АВТОРИЗАЦИЯ - без изменений
+// ============================================================
+
+async function handleLogin() {
+    const password = document.getElementById('passwordInput').value.trim();
+    const errorDiv = document.getElementById('loginError');
+
+    if (!password) {
+        errorDiv.textContent = 'Введите пароль';
+        return;
+    }
+
+    showLoading();
+    errorDiv.textContent = '';
+
+    const result = await apiRequest({ action: 'login', password: password });
+    hideLoading();
+
+    if (result.success) {
+        currentUser = {
+            role: result.role,
+            department: result.department,
+            employees: result.employees || [],
+            password: password
+        };
+        sessionStorage.setItem('user', JSON.stringify(currentUser));
+        await loadSettings();
+        showMainScreen();
+        showToast('Добро пожаловать!', 'success');
+    } else {
+        if (result.timeout) {
+            errorDiv.textContent = 'Сервер не отвечает. Попробуйте позже.';
+        } else {
+            errorDiv.textContent = result.error || 'Неверный пароль';
+        }
+    }
+}
+
+function handleLogout() {
+    sessionStorage.removeItem('user');
+    currentUser = { role: '', department: '', employees: [], password: '' };
+    document.getElementById('mainScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('loginError').textContent = '';
+    showToast('Вы вышли из системы', 'success');
+}
+
+async function checkSession() {
+    const savedUser = sessionStorage.getItem('user');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showLoading();
+        const result = await apiRequest({ action: 'login', password: currentUser.password });
+        hideLoading();
+        if (result.success) {
+            currentUser.employees = result.employees || currentUser.employees;
+            await loadSettings();
+            showMainScreen();
+        } else {
+            sessionStorage.removeItem('user');
+        }
+    }
+}
+
+// ============================================================
+// ЗАГРУЗКА НАСТРОЕК - без изменений
+// ============================================================
+
+async function loadSettings() {
+    showLoading();
+    const result = await apiRequest({ action: 'getSettings', password: currentUser.password });
+    hideLoading();
+
+    if (result.success) {
+        settings = {
+            units: result.units || [],
+            categories: result.categories || [],
+            departments: result.departments || []
+        };
+        currentUser.employees = result.employees || currentUser.employees;
+        currentUser.department = result.department || currentUser.department;
+        populateSelects();
+    } else {
+        if (result.timeout) {
+            showToast('Сервер долго отвечает. Попробуйте обновить страницу.', 'warning');
+        } else {
+            showToast('Ошибка загрузки настроек: ' + (result.error || ''), 'error');
+        }
+    }
+}
+
+function populateSelects() {
+    var deptSelect = document.getElementById('orderDepartment');
+    deptSelect.innerHTML = '';
+
+    if (currentUser.role === 'admin') {
+        deptSelect.disabled = false;
+        settings.departments.forEach(function(dept) {
+            deptSelect.innerHTML += '<option value="' + dept + '">' + dept + '</option>';
+        });
+    } else {
+        deptSelect.disabled = true;
+        deptSelect.innerHTML = '<option value="' + currentUser.department + '">' + currentUser.department + '</option>';
+    }
+
+    var catSelect = document.getElementById('orderCategory');
+    catSelect.innerHTML = '<option value="">Выберите...</option>';
+    settings.categories.forEach(function(cat) {
+        catSelect.innerHTML += '<option value="' + cat + '">' + cat + '</option>';
+    });
+
+    var createdBySelect = document.getElementById('orderCreatedBy');
+    createdBySelect.innerHTML = '<option value="">Выберите...</option>';
+    currentUser.employees.forEach(function(emp) {
+        createdBySelect.innerHTML += '<option value="' + emp + '">' + emp + '</option>';
+    });
+
+    var filterDeptSelect = document.getElementById('filterDepartment');
+    filterDeptSelect.innerHTML = '<option value="">Все</option>';
+    if (currentUser.role === 'admin') {
+        filterDeptSelect.disabled = false;
+        settings.departments.forEach(function(dept) {
+            filterDeptSelect.innerHTML += '<option value="' + dept + '">' + dept + '</option>';
+        });
+    } else {
+        filterDeptSelect.disabled = true;
+    }
+}
+
+// ============================================================
+// ГЛАВНЫЙ ЭКРАН - без изменений
+// ============================================================
+
+function showMainScreen() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display = 'block';
+    document.getElementById('userDepartment').textContent =
+        currentUser.role === 'admin' ? 'Администратор' : currentUser.department;
+    document.getElementById('orderDate').value = formatDate(new Date());
+    clearForm();
+}
+
+// ============================================================
+// УПРАВЛЕНИЕ ПОЗИЦИЯМИ - без изменений
+// ============================================================
+
+function addPositionRow(data) {
+    var tbody = document.getElementById('positionsBody');
+    var currentRows = tbody.querySelectorAll('tr').length;
+
+    if (currentRows >= 15) {
+        showToast('Максимум 15 позиций', 'warning');
+        return;
+    }
+
+    positionRowCount++;
+    var rowNum = currentRows + 1;
+
+    var unitsOptions = '<option value="">-</option>';
+    settings.units.forEach(function(unit) {
+        var selected = (data && data.unit === unit) ? ' selected' : '';
+        unitsOptions += '<option value="' + unit + '"' + selected + '>' + unit + '</option>';
+    });
+
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-row-id', positionRowCount);
+    tr.innerHTML =
+        '<td class="col-num">' + rowNum + '</td>' +
+        '<td class="col-name"><input type="text" placeholder="Наименование" value="' + (data ? data.name : '') + '"></td>' +
+        '<td class="col-unit"><select>' + unitsOptions + '</select></td>' +
+        '<td class="col-qty"><input type="number" min="0" step="0.01" placeholder="0" value="' + (data ? data.quantity : '') + '"></td>' +
+        '<td class="col-article"><input type="text" placeholder="Артикул" value="' + (data ? data.article : '') + '"></td>' +
+        '<td class="col-note"><input type="text" placeholder="Примечание" value="' + (data ? data.note : '') + '"></td>' +
+        '<td class="col-action"><button class="delete-row-btn" onclick="deletePositionRow(this)">✕</button></td>';
+
+    tbody.appendChild(tr);
+}
+
+function deletePositionRow(btn) {
+    var tbody = document.getElementById('positionsBody');
+    if (tbody.querySelectorAll('tr').length <= 1) {
+        showToast('Должна остаться хотя бы одна позиция', 'warning');
+        return;
+    }
+    btn.closest('tr').remove();
+    renumberPositions();
+}
+
+function renumberPositions() {
+    var rows = document.getElementById('positionsBody').querySelectorAll('tr');
+    rows.forEach(function(row, index) {
+        row.querySelector('.col-num').textContent = index + 1;
+    });
+}
+
+function getPositionsData() {
+    var rows = document.getElementById('positionsBody').querySelectorAll('tr');
+    var positions = [];
+
+    rows.forEach(function(row) {
+        var inputs = row.querySelectorAll('input');
+        var select = row.querySelector('select');
+        var name = inputs[0].value.trim();
+        var quantity = inputs[1].value.trim();
+
+        if (name || quantity) {
+            positions.push({
+                name: name,
+                unit: select.value,
+                quantity: quantity,
+                article: inputs[2].value.trim(),
+                note: inputs[3].value.trim()
+            });
+        }
+    });
+
+    return positions;
+}
+
+function clearForm() {
+    document.getElementById('orderNumber').value = '';
+    document.getElementById('orderDate').value = formatDate(new Date());
+    document.getElementById('orderObject').value = '';
+    document.getElementById('orderCategory').value = '';
+    document.getElementById('orderCreatedBy').value = '';
+    document.getElementById('positionsBody').innerHTML = '';
+    positionRowCount = 0;
+    addPositionRow();
+}
+
+// ============================================================
+// ДОБАВЛЕНО: БУФЕР ОЧЕРЕДИ ОТПРАВКИ ЗАЯВОК
+// Хранит заявки в localStorage. Статусы:
+//   pending  - создана, ожидает/в процессе
+//   sending  - идёт запрос
+//   error    - ошибка/таймаут, доступен ручной повтор
+//   sent     - успешно отправлена
+// ============================================================
+
+function queueLoad() {
+    try {
+        var raw = localStorage.getItem(QUEUE_STORAGE_KEY);
+        var arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function queueSave(arr) {
+    try {
+        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(arr));
+    } catch (e) {
+        console.warn('Не удалось сохранить очередь:', e);
+    }
+}
+
+function queueAdd(item) {
+    var arr = queueLoad();
+    arr.push(item);
+    queueSave(arr);
+    renderQueueIndicator();
+    renderQueueList();
+    return item;
+}
+
+function queueUpdate(id, changes) {
+    var arr = queueLoad();
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i].id === id) {
+            for (var k in changes) { arr[i][k] = changes[k]; }
+            break;
+        }
+    }
+    queueSave(arr);
+    renderQueueIndicator();
+    renderQueueList();
+}
+
+function queueRemove(id) {
+    var arr = queueLoad().filter(function(it) { return it.id !== id; });
+    queueSave(arr);
+    renderQueueIndicator();
+    renderQueueList();
+}
+
+// Удаляет все успешно отправленные записи (вызывается
+// при создании следующей новой заявки)
+function queueClearSent() {
+    var arr = queueLoad().filter(function(it) { return it.status !== 'sent'; });
+    queueSave(arr);
+}
+
+function renderQueueIndicator() {
+    var arr = queueLoad();
+    var indicator = document.getElementById('queueIndicator');
+    var textEl = document.getElementById('queueIndicatorText');
+    var countEl = document.getElementById('queueIndicatorCount');
+    if (!indicator) return;
+
+    if (arr.length === 0) {
+        indicator.classList.remove('visible');
+        return;
+    }
+
+    var hasSending = arr.some(function(it) { return it.status === 'sending'; });
+    var hasError = arr.some(function(it) { return it.status === 'error'; });
+    var hasPending = arr.some(function(it) { return it.status === 'pending'; });
+
+    indicator.classList.remove('state-sending', 'state-pending', 'state-error', 'state-sent');
+
+    var label = 'Очередь';
+    if (hasSending) { indicator.classList.add('state-sending'); label = 'Отправка...'; }
+    else if (hasError) { indicator.classList.add('state-error'); label = 'Есть ошибки'; }
+    else if (hasPending) { indicator.classList.add('state-pending'); label = 'Ожидание'; }
+    else { indicator.classList.add('state-sent'); label = 'Отправлено'; }
+
+    textEl.textContent = label;
+    countEl.textContent = arr.length;
+    indicator.classList.add('visible');
+}
+
+function statusLabel(status) {
+    if (status === 'pending') return 'Ожидает';
+    if (status === 'sending') return 'Отправка';
+    if (status === 'error') return 'Ошибка';
+    if (status === 'sent') return 'Отправлено';
+    return status;
+}
+
+function renderQueueList() {
+    var body = document.getElementById('queueListBody');
+    var empty = document.getElementById('queueEmpty');
+    if (!body) return;
+
+    var arr = queueLoad();
+    body.innerHTML = '';
+
+    if (arr.length === 0) {
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    arr.slice().reverse().forEach(function(item) {
+        var sub = (item.payload.department || '-') + ' • ' +
+                  (item.payload.object || '-') + ' • ' +
+                  (item.payload.category || '-');
+        var posCount = 0;
+        try { posCount = JSON.parse(decodeURIComponent(item.payload.positions)).length; } catch (e) {}
+
+        var errHtml = (item.status === 'error' && item.lastError)
+            ? '<div class="qitem-err">' + item.lastError + '</div>' : '';
+
+        var actionsHtml = '';
+        if (item.status === 'error') {
+            actionsHtml += '<button class="btn btn-primary" onclick="retryQueueItem(\'' + item.id + '\')">↻ Повторить</button>';
+        }
+        if (item.status === 'error' || item.status === 'sent') {
+            actionsHtml += '<button class="btn btn-danger" onclick="removeQueueItem(\'' + item.id + '\')">✕ Убрать</button>';
+        }
+
+        var div = document.createElement('div');
+        div.className = 'queue-item';
+        div.innerHTML =
+            '<div class="qitem-main">' +
+                '<div class="qitem-title">' + (item.orderNumber ? ('Заявка ' + item.orderNumber) : 'Новая заявка') + '</div>' +
+                '<div class="qitem-sub">' + sub + ' • позиций: ' + posCount + '</div>' +
+                '<div class="qitem-sub">Создана: ' + item.createdAt + '</div>' +
+                errHtml +
+                '<span class="qitem-status ' + item.status + '">' + statusLabel(item.status) + '</span>' +
+            '</div>' +
+            '<div class="qitem-actions">' + actionsHtml + '</div>';
+        body.appendChild(div);
+    });
+}
+
+function openQueueModal() {
+    renderQueueList();
+    document.getElementById('queueModal').classList.add('active');
+}
+
+function closeQueueModal() {
+    document.getElementById('queueModal').classList.remove('active');
+}
+
+function removeQueueItem(id) {
+    queueRemove(id);
+}
+
+// Ручной повтор отправки для записи со статусом error.
+// Использует ТОТ ЖЕ формат payload, что и saveOrder.
+async function retryQueueItem(id) {
+    var arr = queueLoad();
+    var item = null;
+    for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) { item = arr[i]; break; } }
+    if (!item) return;
+
+    queueUpdate(id, { status: 'sending', lastError: '' });
+    showLoading();
+
+    var result = await apiRequest({
+        action: 'saveOrder',
+        password: currentUser.password,
+        department: item.payload.department,
+        object: item.payload.object,
+        category: item.payload.category,
+        createdBy: item.payload.createdBy,
+        positions: item.payload.positions
+    });
+
+    hideLoading();
+
+    if (result.success) {
+        queueUpdate(id, { status: 'sent', orderNumber: result.orderNumber, lastError: '' });
+        showToast('Заявка ' + result.orderNumber + ' отправлена!', 'success');
+    } else {
+        var msg = result.timeout
+            ? 'Сервер долго отвечает. Проверьте историю - возможно, заявка сохранена.'
+            : (result.error || 'Ошибка отправки');
+        queueUpdate(id, { status: 'error', lastError: msg });
+        showToast(msg, result.timeout ? 'warning' : 'error');
+    }
+}
+
+// ============================================================
+// СОХРАНЕНИЕ ЗАЯВКИ - доработано: постановка в очередь
+// Формат payload для saveOrder НЕ изменён.
+// ============================================================
+
+async function saveOrder() {
+    var department = document.getElementById('orderDepartment').value;
+    var object = document.getElementById('orderObject').value.trim();
+    var category = document.getElementById('orderCategory').value;
+    var createdBy = document.getElementById('orderCreatedBy').value;
+
+    if (!object) {
+        showToast('Укажите объект', 'error');
+        return;
+    }
+    if (!category) {
+        showToast('Выберите категорию', 'error');
+        return;
+    }
+    if (!createdBy) {
+        showToast('Укажите, кто создал заявку', 'error');
+        return;
+    }
+
+    var positions = getPositionsData();
+
+    if (positions.length === 0) {
+        showToast('Добавьте хотя бы одну позицию', 'error');
+        return;
+    }
+
+    for (var i = 0; i < positions.length; i++) {
+        if (!positions[i].name) {
+            showToast('Укажите наименование в позиции ' + (i + 1), 'error');
+            return;
+        }
+        if (!positions[i].unit) {
+            showToast('Выберите ед. измерения в позиции ' + (i + 1), 'error');
+            return;
+        }
+        if (!positions[i].quantity || positions[i].quantity <= 0) {
+            showToast('Укажите количество в позиции ' + (i + 1), 'error');
+            return;
+        }
+    }
+
+    // ДОБАВЛЕНО: чистим ранее успешно отправленные записи
+    queueClearSent();
+
+    // ДОБАВЛЕНО: формируем payload в ТОМ ЖЕ формате, что и запрос
+    var encodedPositions = encodeURIComponent(JSON.stringify(positions));
+    var queueId = 'q_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    queueAdd({
+        id: queueId,
+        status: 'pending',
+        createdAt: formatDate(new Date()),
+        orderNumber: '',
+        lastError: '',
+        payload: {
+            department: department,
+            object: object,
+            category: category,
+            createdBy: createdBy,
+            positions: encodedPositions
+        }
+    });
+
+    queueUpdate(queueId, { status: 'sending' });
+    showLoading();
+
+    var result = await apiRequest({
+        action: 'saveOrder',
+        password: currentUser.password,
+        department: department,
+        object: object,
+        category: category,
+        createdBy: createdBy,
+        positions: encodedPositions
+    });
+
+        hideLoading();
+
+    // ДОБАВЛЕНО: фиксируем результат в очереди
+    if (result.success) {
+        queueUpdate(queueId, { status: 'sent', orderNumber: result.orderNumber, lastError: '' });
+        showToast('Заявка ' + result.orderNumber + ' сохранена!', 'success');
+        clearForm();
+    } else {
+        var errMsg = result.timeout
+            ? 'Сервер долго отвечает. Проверьте историю - возможно, заявка сохранена.'
+            : (result.error || 'Ошибка сохранения');
+        queueUpdate(queueId, { status: 'error', lastError: errMsg });
+        showToast(errMsg, result.timeout ? 'warning' : 'error');
+    }
+}
+
+// ============================================================
+// ИСТОРИЯ ЗАЯВОК - без изменений
+// ============================================================
+
+function openHistory() {
+    document.getElementById('historyModal').classList.add('active');
+    loadHistory();
+}
+
+function closeHistory() {
+    document.getElementById('historyModal').classList.remove('active');
+}
+
+function clearFilters() {
+    document.getElementById('filterDepartment').value = '';
+    document.getElementById('filterDate').value = '';
+    loadHistory();
+}
+
+async function loadHistory() {
+    var filterDept = document.getElementById('filterDepartment').value;
+    var filterDate = document.getElementById('filterDate').value;
+
+    showLoading();
+
+    var formattedDate = '';
+    if (filterDate) {
+        var d = new Date(filterDate);
+        formattedDate = String(d.getDate()).padStart(2, '0') + '.' +
+                        String(d.getMonth() + 1).padStart(2, '0') + '.' +
+                        d.getFullYear();
+    }
+
+    var result = await apiRequest({
+        action: 'getHistory',
+        password: currentUser.password,
+        filterDept: filterDept,
+        filterDate: formattedDate
+    });
+
+    hideLoading();
+
+    var tbody = document.getElementById('historyBody');
+    var emptyDiv = document.getElementById('historyEmpty');
+
+    if (result.success && result.orders && result.orders.length > 0) {
+        tbody.innerHTML = '';
+        emptyDiv.style.display = 'none';
+
+        result.orders.forEach(function(order) {
+            var statusClass = 'pending';
+            var statusText = 'Ожидает';
+
+            if (order.completedPositions === order.totalPositions && order.totalPositions > 0) {
+                statusClass = 'completed';
+                statusText = 'Выполнено';
+            } else if (order.completedPositions > 0) {
+                statusClass = 'partial';
+                statusText = order.completedPositions + '/' + order.totalPositions;
+            }
+
+            var tr = document.createElement('tr');
+            tr.onclick = function() { openOrderDetails(order.id); };
+            tr.innerHTML =
+                '<td><strong>' + order.number + '</strong></td>' +
+                '<td>' + order.date + '</td>' +
+                '<td>' + order.department + '</td>' +
+                '<td>' + (order.object || '-') + '</td>' +
+                '<td>' + order.category + '</td>' +
+                '<td>' + (order.createdBy || '-') + '</td>' +
+                '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
+
+            tbody.appendChild(tr);
+        });
+    } else {
+        tbody.innerHTML = '';
+        if (result.timeout) {
+            emptyDiv.textContent = 'Сервер долго отвечает. Попробуйте позже.';
+        } else {
+            emptyDiv.textContent = 'Заявки не найдены';
+        }
+        emptyDiv.style.display = 'block';
+    }
+}
+
+// ============================================================
+// ДЕТАЛИ ЗАЯВКИ - без изменений
+// ============================================================
+
+async function openOrderDetails(orderId) {
+    currentOrderId = orderId;
+    showLoading();
+
+    var result = await apiRequest({
+        action: 'getOrderDetails',
+        orderId: orderId,
+        password: currentUser.password
+    });
+
+    hideLoading();
+
+    if (result.success) {
+        var order = result.order;
+
+        document.getElementById('detailsOrderNumber').textContent = order.number;
+        document.getElementById('detailNumber').textContent = order.number;
+        document.getElementById('detailDate').textContent = order.date;
+        document.getElementById('detailDepartment').textContent = order.department;
+        document.getElementById('detailObject').textContent = order.object || '-';
+        document.getElementById('detailCategory').textContent = order.category;
+        document.getElementById('detailCreatedBy').textContent = order.createdBy || '-';
+
+        document.getElementById('deleteOrderBtn').style.display =
+            currentUser.role === 'admin' ? 'inline-flex' : 'none';
+
+        var tbody = document.getElementById('detailsPositionsBody');
+        tbody.innerHTML = '';
+
+        result.positions.forEach(function(pos) {
+            var statusClass = pos.status == 1 ? 'completed' : 'not-completed';
+            var statusIcon = pos.status == 1 ? '✓' : '✕';
+            var canChange = result.canChangeStatus && (currentUser.role === 'admin' || pos.status == 0);
+
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td class="col-num">' + pos.position + '</td>' +
+                '<td class="col-name">' + pos.name + '</td>' +
+                '<td class="col-unit">' + pos.unit + '</td>' +
+                '<td class="col-qty">' + pos.quantity + '</td>' +
+                '<td class="col-article">' + (pos.article || '-') + '</td>' +
+                '<td class="col-note">' + (pos.note || '-') + '</td>' +
+                '<td class="col-status">' +
+                    '<button class="status-btn ' + statusClass + '" ' +
+                        'onclick="toggleStatus(' + pos.rowIndex + ', ' + pos.status + ', \'' + orderId + '\')" ' +
+                        (canChange ? '' : 'disabled') + '>' +
+                        statusIcon +
+                    '</button>' +
+                '</td>';
+
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('historyModal').classList.remove('active');
+        document.getElementById('orderDetailsModal').classList.add('active');
+    } else {
+        if (result.timeout) {
+            showToast('Сервер долго отвечает. Попробуйте позже.', 'warning');
+        } else {
+            showToast(result.error || 'Ошибка загрузки заявки', 'error');
+        }
+    }
+}
+
+function closeOrderDetails() {
+    document.getElementById('orderDetailsModal').classList.remove('active');
+    currentOrderId = null;
+    openHistory();
+}
+
+// ============================================================
+// ИЗМЕНЕНИЕ СТАТУСА ПОЗИЦИИ - без изменений
+// ============================================================
+
+async function toggleStatus(rowIndex, currentStatus, orderId) {
+    var newStatus = currentStatus == 1 ? 0 : 1;
+
+    if (currentUser.role !== 'admin' && currentStatus == 1) {
+        showToast('Только администратор может отменить выполнение', 'warning');
+        return;
+    }
+
+    showLoading();
+
+    var result = await apiRequest({
+        action: 'updateStatus',
+        password: currentUser.password,
+        rowIndex: rowIndex,
+        status: newStatus,
+        orderId: orderId
+    });
+
+    hideLoading();
+
+    if (result.success) {
+        showToast(newStatus == 1 ? 'Позиция выполнена' : 'Выполнение отменено', 'success');
+        openOrderDetails(orderId);
+    } else {
+        if (result.timeout) {
+            showToast('Сервер долго отвечает. Попробуйте обновить страницу.', 'warning');
+        } else {
+            showToast(result.error || 'Ошибка обновления статуса', 'error');
+        }
+    }
+}
+
+// ============================================================
+// УДАЛЕНИЕ ЗАЯВКИ - без изменений
+// ============================================================
+
+async function deleteCurrentOrder() {
+    if (!currentOrderId) return;
+    if (!confirm('Вы уверены, что хотите удалить эту заявку?')) return;
+
+    showLoading();
+
+    var result = await apiRequest({
+        action: 'deleteOrder',
+        orderId: currentOrderId,
+        password: currentUser.password
+    });
+
+    hideLoading();
+
+    if (result.success) {
+        showToast('Заявка удалена', 'success');
+        closeOrderDetails();
+    } else {
+        if (result.timeout) {
+            showToast('Сервер долго отвечает. Проверьте историю заявок.', 'warning');
+        } else {
+            showToast(result.error || 'Ошибка удаления', 'error');
+        }
+    }
+}
+
+// ============================================================
+// ПЕЧАТЬ - без изменений
+// ============================================================
+
+function printOrder() {
+    var positions = getPositionsData();
+    if (positions.length === 0) {
+        showToast('Нет данных для печати', 'warning');
+        return;
+    }
+
+    generatePrintContent({
+        number: document.getElementById('orderNumber').value || 'Новая заявка',
+        date: document.getElementById('orderDate').value,
+        department: document.getElementById('orderDepartment').value,
+        object: document.getElementById('orderObject').value,
+        category: document.getElementById('orderCategory').value,
+        createdBy: document.getElementById('orderCreatedBy').value,
+        positions: positions
+    });
+}
+
+function printOrderDetails() {
+    var positions = [];
+    var rows = document.getElementById('detailsPositionsBody').querySelectorAll('tr');
+
+    rows.forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        positions.push({
+            name: cells[1].textContent,
+            unit: cells[2].textContent,
+            quantity: cells[3].textContent,
+            article: cells[4].textContent,
+            note: cells[5].textContent
+        });
+    });
+
+    generatePrintContent({
+        number: document.getElementById('detailNumber').textContent,
+        date: document.getElementById('detailDate').textContent,
+        department: document.getElementById('detailDepartment').textContent,
+        object: document.getElementById('detailObject').textContent,
+        category: document.getElementById('detailCategory').textContent,
+        createdBy: document.getElementById('detailCreatedBy').textContent,
+        positions: positions
+    });
+}
+
+function generatePrintContent(data) {
+    var positionsHTML = '';
+
+    data.positions.forEach(function(pos, index) {
+        positionsHTML +=
+            '<tr>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + (index + 1) + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;">' + pos.name + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + pos.unit + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + pos.quantity + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + (pos.article || '-') + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;">' + (pos.note || '-') + '</td>' +
+            '</tr>';
+    });
+
+    var printWindow = window.open('', '_blank');
+    printWindow.document.write(
+        '<!DOCTYPE html>' +
+        '<html>' +
+        '<head>' +
+            '<title>Заявка ' + data.number + '</title>' +
+            '<style>' +
+                'body { font-family: Arial, sans-serif; padding: 20px; }' +
+                'h1 { text-align: center; font-size: 18px; margin-bottom: 20px; }' +
+                '.header-info { margin-bottom: 20px; }' +
+                '.header-info p { margin: 5px 0; }' +
+                'table { width: 100%; border-collapse: collapse; margin-top: 20px; }' +
+                'th { border: 1px solid #000; padding: 8px; background: #f0f0f0; font-size: 12px; }' +
+                '.footer { margin-top: 40px; }' +
+                '.signature-block { margin-top: 30px; }' +
+            '</style>' +
+        '</head>' +
+        '<body>' +
+            '<h1>ЗАЯВКА НА МАТЕРИАЛЫ № ' + data.number + '</h1>' +
+
+            '<div class="header-info">' +
+                '<p><strong>Дата:</strong> ' + data.date + '</p>' +
+                '<p><strong>Подразделение:</strong> ' + data.department + '</p>' +
+                '<p><strong>Объект:</strong> ' + (data.object || '-') + '</p>' +
+                '<p><strong>Категория:</strong> ' + data.category + '</p>' +
+                '<p><strong>Создал заявку:</strong> ' + (data.createdBy || '-') + '</p>' +
+            '</div>' +
+
+            '<table>' +
+                '<thead>' +
+                    '<tr>' +
+                        '<th style="width:40px;">№</th>' +
+                        '<th>Наименование материала</th>' +
+                        '<th style="width:60px;">Ед.изм.</th>' +
+                        '<th style="width:60px;">Кол-во</th>' +
+                        '<th style="width:100px;">Артикул</th>' +
+                        '<th style="width:150px;">Примечание</th>' +
+                    '</tr>' +
+                '</thead>' +
+                '<tbody>' + positionsHTML + '</tbody>' +
+            '</table>' +
+
+            '<div class="footer">' +
+                '<div class="signature-block">' +
+                    '<p><strong>Создал заявку:</strong> _______________ / ' + (data.createdBy || '_______________') + ' /</p>' +
+                '</div>' +
+                '<div class="signature-block">' +
+                    '<p><strong>Принял в работу:</strong> _______________ / _______________ /</p>' +
+                    '<p><strong>Дата:</strong> _______________</p>' +
+                '</div>' +
+            '</div>' +
+        '</body>' +
+        '</html>'
+    );
+    printWindow.document.close();
+    printWindow.print();
+}
+
+// ============================================================
+// ИНИЦИАЛИЗАЦИЯ - доработано: отрисовка индикатора очереди
+// ============================================================
+
+document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        handleLogin();
+    }
+});
+
+window.onload = function() {
+    checkSession();
+    renderQueueIndicator(); // ДОБАВЛЕНО: показать очередь, если есть незавершённые
+};
+
+</script>
+</body>
+</html>
+<!-- ============================================================
+     КОНЕЦ ФАЙЛА index.html (с буфером очереди отправки)
+     ============================================================ -->
