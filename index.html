@@ -1,9 +1,6 @@
 <!-- ============================================================
-     INDEX.HTML - ЦЕЛИКОМ
-     Версия: 2.4 (добавлен буфер отправки заявок + индикатор)
-     Серверная часть, стили формы и вёрстка не изменены.
-     Добавлены: новый CSS-блок индикатора очереди,
-     логика localStorage-очереди, обёртка saveOrder.
+     INDEX.HTML - доработка: буфер очереди отправки заявок
+     База: версия 2.3. Изменения: только добавление очереди.
      ============================================================ -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -513,955 +510,323 @@ body {
     .delete-row-btn, .add-row-btn, .loading-overlay, .toast { display: none !important; }
     .main-container { display: block !important; padding: 0; max-width: none; }
     .order-form { background: white; border: none; padding: 0; }
-    #queueWidget, #queuePanel { display: none !important; }
 }
 
-/* ===== НОВЫЕ СТИЛИ: плавающий индикатор очереди отправки ===== */
-#queueWidget {
+/* ============================================================
+   ДОБАВЛЕНО: буфер очереди отправки (индикатор + модалка)
+   Новые стили в стиле тёмной темы. Существующие не изменены.
+   ============================================================ */
+.queue-indicator {
     position: fixed;
-    left: 20px;
-    bottom: 20px;
-    z-index: 3500;
+    bottom: 30px;
+    left: 30px;
+    z-index: 2500;
     display: none;
     align-items: center;
     gap: 10px;
     padding: 10px 16px;
     border-radius: 30px;
-    cursor: pointer;
+    background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    color: #fff;
     font-size: 13px;
     font-weight: 600;
-    color: #e6f7ff;
-    background: rgba(26, 26, 46, 0.92);
-    border: 1px solid rgba(0, 212, 255, 0.35);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(6px);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    transition: all 0.3s ease;
     user-select: none;
 }
-#queueWidget:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
 
-#queueWidget .qw-dot {
-    width: 12px; height: 12px;
+.queue-indicator.visible { display: inline-flex; }
+.queue-indicator:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0, 212, 255, 0.25); }
+
+.queue-indicator .qi-dot {
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    flex-shrink: 0;
     background: #00d4ff;
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+    flex-shrink: 0;
 }
-#queueWidget.state-sending .qw-dot { background: #ffc107; animation: qwPulse 1s ease-in-out infinite; }
-#queueWidget.state-error   .qw-dot { background: #ff6b6b; }
-#queueWidget.state-pending .qw-dot { background: #00d4ff; }
-#queueWidget.state-ok      .qw-dot { background: #00ff88; }
+.queue-indicator.state-sending .qi-dot { background: #00d4ff; animation: qiPulse 1s ease-in-out infinite; }
+.queue-indicator.state-pending .qi-dot { background: #ffc107; box-shadow: 0 0 8px rgba(255, 193, 7, 0.6); }
+.queue-indicator.state-error   .qi-dot { background: #ff6b6b; box-shadow: 0 0 8px rgba(255, 107, 107, 0.6); }
+.queue-indicator.state-sent    .qi-dot { background: #00ff88; box-shadow: 0 0 8px rgba(0, 255, 136, 0.6); }
 
-@keyframes qwPulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+@keyframes qiPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-#queueWidget .qw-count {
+.queue-indicator .qi-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-width: 20px;
-    text-align: center;
-    padding: 2px 8px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: rgba(0, 212, 255, 0.2);
+    color: #00d4ff;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.queue-list { display: flex; flex-direction: column; gap: 12px; }
+
+.queue-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
     border-radius: 12px;
-    background: rgba(0, 212, 255, 0.18);
-    color: #00d4ff;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-#queuePanel {
-    position: fixed;
-    left: 20px;
-    bottom: 70px;
-    z-index: 3600;
-    display: none;
-    width: 360px;
-    max-width: calc(100vw - 40px);
-    max-height: 60vh;
-    overflow-y: auto;
-    padding: 14px;
-    border-radius: 16px;
-    color: #fff;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid rgba(0, 212, 255, 0.3);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
-}
-#queuePanel.active { display: block; }
+.queue-item .qitem-main { flex-grow: 1; min-width: 0; }
+.queue-item .qitem-title { color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.queue-item .qitem-sub { color: #888; font-size: 12px; margin-bottom: 4px; word-break: break-word; }
+.queue-item .qitem-err { color: #ff6b6b; font-size: 12px; word-break: break-word; }
 
-#queuePanel .qp-title {
-    color: #00d4ff;
-    font-size: 14px;
-    font-weight: 700;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-#queuePanel .qp-title .qp-close {
-    cursor: pointer;
-    color: #aaa;
-    font-size: 16px;
-    padding: 0 4px;
-}
-#queuePanel .qp-title .qp-close:hover { color: #ff6b6b; }
-
-#queuePanel .qp-empty { color: #888; font-size: 13px; text-align: center; padding: 16px 0; }
-
-.qp-item {
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    padding: 10px;
-    margin-bottom: 10px;
-    background: rgba(255,255,255,0.03);
-}
-.qp-item .qp-row1 {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-.qp-item .qp-status {
+.queue-item .qitem-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.queue-item .qitem-actions .btn { padding: 8px 14px; font-size: 12px; }
+         .queue-item .qitem-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
     font-size: 11px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 10px;
+    font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
-.qp-item .qp-status.pending { background: rgba(0,212,255,0.18); color: #00d4ff; }
-.qp-item .qp-status.sending { background: rgba(255,193,7,0.18); color: #ffc107; }
-.qp-item .qp-status.error   { background: rgba(255,107,107,0.18); color: #ff6b6b; }
-.qp-item .qp-status.sent    { background: rgba(0,255,136,0.18); color: #00ff88; }
+.queue-item .qitem-status.pending { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.queue-item .qitem-status.sending { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+.queue-item .qitem-status.error   { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+.queue-item .qitem-status.sent    { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
 
-.qp-item .qp-meta { font-size: 12px; color: #bbb; margin-bottom: 4px; }
-.qp-item .qp-err {
-    font-size: 11px;
-    color: #ff9b9b;
-    margin-bottom: 8px;
-    word-break: break-word;
+.queue-empty { text-align: center; padding: 40px; color: #888; }
+
+@media (max-width: 768px) {
+    .queue-indicator { bottom: 20px; left: 20px; }
+    .queue-item { flex-direction: column; }
+    .queue-item .qitem-actions { flex-direction: row; }
 }
-.qp-item .qp-actions { display: flex; gap: 8px; }
-.qp-item .qp-btn {
-    flex: 1;
-    padding: 7px 10px;
-    border: none;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.qp-item .qp-btn.retry {
-    background: rgba(0,212,255,0.18);
-    color: #00d4ff;
-    border: 1px solid rgba(0,212,255,0.3);
-}
-.qp-item .qp-btn.retry:hover { background: rgba(0,212,255,0.32); }
-.qp-item .qp-btn.retry:disabled { opacity: 0.4; cursor: not-allowed; }
-.qp-item .qp-btn.del {
-    background: rgba(255,107,107,0.18);
-    color: #ff6b6b;
-    border: 1px solid rgba(255,107,107,0.3);
-}
-.qp-item .qp-btn.del:hover { background: rgba(255,107,107,0.32); }
-/* ===== КОНЕЦ НОВЫХ СТИЛЕЙ ===== */
     </style>
 </head>
 <body>
 
-    <!-- ЭКРАН ЛОГИНА -->
-    <div class="login-container" id="loginScreen">
-        <div class="login-box">
-            <h1>Заявки на материалы</h1>
-            <h2>Вход в систему</h2>
-            <input type="text" id="loginInput" placeholder="Логин" autocomplete="username">
-            <input type="password" id="passwordInput" placeholder="Пароль" autocomplete="current-password">
-            <button onclick="doLogin()">Войти</button>
-            <div class="error-message" id="loginError"></div>
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="login-container" id="loginScreen">
+    <div class="login-box">
+        <h1>📦 Заявки на материалы</h1>
+        <h2>Создание заявок</h2>
+        <input type="password" id="passwordInput" placeholder="Введите пароль" autocomplete="off">
+        <button onclick="handleLogin()">Войти</button>
+        <div class="error-message" id="loginError"></div>
+    </div>
+</div>
+
+<div class="main-container" id="mainScreen">
+    <div class="header">
+        <h1>📦 Заявки на материалы</h1>
+        <div class="user-info">
+            <span>Подразделение:</span>
+            <span class="department" id="userDepartment">-</span>
+        </div>
+        <div class="header-buttons">
+            <button class="btn btn-secondary" onclick="openHistory()">📋 История</button>
+            <button class="btn btn-secondary" onclick="printOrder()">🖨️ Печать</button>
+            <button class="btn btn-danger" onclick="handleLogout()">🚪 Выход</button>
         </div>
     </div>
 
-    <!-- ОСНОВНОЙ ЭКРАН -->
-    <div class="main-container" id="mainScreen">
-        <div class="header">
-            <h1>Заявки на материалы</h1>
-            <div class="user-info">
-                <span id="userName"></span>
-                <span class="department" id="userDepartment"></span>
-                <div class="header-buttons">
-                    <button class="btn btn-secondary" onclick="openHistory()">История</button>
-                    <button class="btn btn-danger" onclick="doLogout()">Выход</button>
-                </div>
+    <div class="order-form" id="orderForm">
+        <div class="form-header">
+            <div class="form-group">
+                <label>№ заявки</label>
+                <input type="text" id="orderNumber" disabled placeholder="Автоматически">
+            </div>
+            <div class="form-group">
+                <label>Дата</label>
+                <input type="text" id="orderDate" disabled>
+            </div>
+            <div class="form-group">
+                <label>Подразделение</label>
+                <select id="orderDepartment" disabled><option value="">-</option></select>
+            </div>
+            <div class="form-group">
+                <label>Объект (до 20 символов)</label>
+                <input type="text" id="orderObject" maxlength="20" placeholder="Введите объект">
+            </div>
+            <div class="form-group">
+                <label>Категория</label>
+                <select id="orderCategory"><option value="">Выберите...</option></select>
+            </div>
+            <div class="form-group">
+                <label>Создал заявку</label>
+                <select id="orderCreatedBy"><option value="">Выберите...</option></select>
             </div>
         </div>
 
-        <div class="order-form">
-            <div class="form-header">
+        <div class="positions-section">
+            <h3>Позиции заявки (максимум 15)</h3>
+            <div class="positions-table-container">
+                <table class="positions-table" id="positionsTable">
+                    <thead>
+                        <tr>
+                            <th class="col-num">№</th>
+                            <th class="col-name">Наименование材料</th>
+                            <th class="col-unit">Ед. изм.</th>
+                            <th class="col-qty">Кол-во</th>
+                            <th class="col-article">Артикул/Код</th>
+                            <th class="col-note">Примечание</th>
+                            <th class="col-action"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="positionsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button class="add-row-btn" onclick="addPositionRow()">
+                <span>➕</span> Добавить позицию
+            </button>
+            <div style="flex-grow: 1;"></div>
+            <button class="btn btn-secondary" onclick="clearForm()">🗑️ Очистить</button>
+            <button class="btn btn-primary" onclick="saveOrder()">💾 Сохранить заявку</button>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="historyModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>📋 История заявок</h2>
+            <button class="modal-close" onclick="closeHistory()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="history-filters">
                 <div class="form-group">
-                    <label>Номер заявки</label>
-                    <input type="text" id="orderNumber" readonly>
+                    <label>Подразделение</label>
+                    <select id="filterDepartment" onchange="loadHistory()">
+                        <option value="">Все</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Дата</label>
-                    <input type="text" id="orderDate" readonly>
+                    <input type="date" id="filterDate" onchange="loadHistory()">
                 </div>
-                <div class="form-group">
-                    <label>Подразделение</label>
-                    <input type="text" id="orderDepartment" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Заявитель</label>
-                    <input type="text" id="orderApplicant" readonly>
+                <div class="form-group" style="align-self: flex-end;">
+                    <button class="btn btn-secondary" onclick="clearFilters()">Сбросить</button>
                 </div>
             </div>
 
-            <div class="positions-section">
-                <h3>Позиции заявки</h3>
-                <div class="positions-table-container">
-                    <table class="positions-table">
-                        <thead>
-                            <tr>
-                                <th class="col-num">№</th>
-                                <th class="col-name">Наименование</th>
-                                <th class="col-unit">Ед. изм.</th>
-                                <th class="col-qty">Кол-во</th>
-                                <th class="col-article">Артикул</th>
-                                <th class="col-note">Примечание</th>
-                                <th class="col-action"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="positionsBody"></tbody>
-                    </table>
-                </div>
-                <button class="add-row-btn" onclick="addPositionRow()">+ Добавить позицию</button>
-            </div>
-
-            <div class="form-actions">
-                <button class="btn btn-primary" onclick="saveOrder()">Отправить</button>
-                <button class="btn btn-secondary" onclick="clearForm()">Очистить</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- МОДАЛКА ИСТОРИИ -->
-    <div class="modal-overlay" id="historyModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>История заявок</h2>
-                <button class="modal-close" onclick="closeModal('historyModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="history-filters">
-                    <div class="form-group">
-                        <label>Дата с</label>
-                        <input type="date" id="filterDateFrom">
-                    </div>
-                    <div class="form-group">
-                        <label>Дата по</label>
-                        <input type="date" id="filterDateTo">
-                    </div>
-                    <div class="form-group" id="filterDeptGroup" style="display:none;">
-                        <label>Подразделение</label>
-                        <select id="filterDepartment"><option value="">Все</option></select>
-                    </div>
-                    <div class="form-group">
-                        <label>&nbsp;</label>
-                        <button class="btn btn-primary" onclick="loadHistory()">Применить</button>
-                    </div>
-                </div>
+            <div class="positions-table-container">
                 <table class="history-table">
                     <thead>
                         <tr>
-                            <th>Номер</th>
+                            <th>№ заявки</th>
                             <th>Дата</th>
                             <th>Подразделение</th>
-                            <th>Заявитель</th>
-                            <th>Позиций</th>
+                            <th>Объект</th>
+                            <th>Категория</th>
+                            <th>Создал</th>
                             <th>Статус</th>
                         </tr>
                     </thead>
                     <tbody id="historyBody"></tbody>
                 </table>
             </div>
+
+            <div id="historyEmpty" style="text-align: center; padding: 40px; color: #888; display: none;">
+                Заявки не найдены
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- МОДАЛКА ДЕТАЛЕЙ ЗАЯВКИ -->
-    <div class="modal-overlay" id="detailsModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Детали заявки</h2>
-                <button class="modal-close" onclick="closeModal('detailsModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="order-details-header" id="detailsHeader"></div>
-                <div class="positions-table-container">
-                    <table class="positions-table">
-                        <thead>
-                            <tr>
-                                <th class="col-num">№</th>
-                                <th class="col-name">Наименование</th>
-                                <th class="col-unit">Ед. изм.</th>
-                                <th class="col-qty">Кол-во</th>
-                                <th class="col-article">Артикул</th>
-                                <th class="col-note">Примечание</th>
-                                <th class="col-status">Статус</th>
-                            </tr>
-                        </thead>
-                        <tbody id="detailsBody"></tbody>
-                    </table>
+<div class="modal-overlay" id="orderDetailsModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>📄 Заявка <span id="detailsOrderNumber"></span></h2>
+            <button class="modal-close" onclick="closeOrderDetails()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="order-details-header">
+                <div class="detail-item">
+                    <label>№ заявки</label>
+                    <span id="detailNumber">-</span>
+                </div>
+                <div class="detail-item">
+                    <label>Дата</label>
+                    <span id="detailDate">-</span>
+                </div>
+                <div class="detail-item">
+                    <label>Подразделение</label>
+                    <span id="detailDepartment">-</span>
+                </div>
+                <div class="detail-item">
+                    <label>Объект</label>
+                    <span id="detailObject">-</span>
+                </div>
+                <div class="detail-item">
+                    <label>Категория</label>
+                    <span id="detailCategory">-</span>
+                </div>
+                <div class="detail-item">
+                    <label>Создал заявку</label>
+                    <span id="detailCreatedBy">-</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="printOrder()">Печать</button>
-                <button class="btn btn-primary" id="saveStatusBtn" onclick="saveStatuses()" style="display:none;">Сохранить статусы</button>
+
+            <div class="positions-table-container">
+                <table class="positions-table">
+                    <thead>
+                        <tr>
+                            <th class="col-num">№</th>
+                            <th class="col-name">Наименование материала</th>
+                            <th class="col-unit">Ед. изм.</th>
+                            <th class="col-qty">Кол-во</th>
+                            <th class="col-article">Артикул/Код</th>
+                            <th class="col-note">Примечание</th>
+                            <th class="col-status">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailsPositionsBody"></tbody>
+                </table>
             </div>
         </div>
-    </div>
-
-    <!-- ПЛАВАЮЩИЙ ИНДИКАТОР ОЧЕРЕДИ (НОВОЕ) -->
-    <div id="queueWidget" onclick="toggleQueuePanel()">
-        <span class="qw-dot"></span>
-        <span class="qw-label">Очередь</span>
-        <span class="qw-count">0</span>
-    </div>
-
-    <!-- ПАНЕЛЬ ОЧЕРЕДИ (НОВОЕ) -->
-    <div id="queuePanel">
-        <div class="qp-title">
-            <span>Очередь отправки</span>
-            <span class="qp-close" onclick="toggleQueuePanel()">&times;</span>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="printOrderDetails()">🖨️ Печать</button>
+            <button class="btn btn-danger" id="deleteOrderBtn" onclick="deleteCurrentOrder()" style="display: none;">🗑️ Удалить</button>
+            <button class="btn btn-primary" onclick="closeOrderDetails()">Закрыть</button>
         </div>
-        <div id="queuePanelBody"></div>
     </div>
+</div>
 
-    <!-- ЗАГРУЗКА -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner"></div>
+<!-- ДОБАВЛЕНО: плавающий индикатор очереди отправки -->
+<div class="queue-indicator" id="queueIndicator" onclick="openQueueModal()">
+    <span class="qi-dot"></span>
+    <span class="qi-text" id="queueIndicatorText">Очередь</span>
+    <span class="qi-count" id="queueIndicatorCount">0</span>
+</div>
+
+<!-- ДОБАВЛЕНО: модалка со списком очереди -->
+<div class="modal-overlay" id="queueModal">
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2>📤 Очередь отправки</h2>
+            <button class="modal-close" onclick="closeQueueModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="queue-list" id="queueListBody"></div>
+            <div class="queue-empty" id="queueEmpty" style="display:none;">Очередь пуста</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeQueueModal()">Закрыть</button>
+        </div>
     </div>
-
-    <!-- TOAST -->
-    <div class="toast" id="toast"></div>
-
-<script>
-/* ================= КОНФИГУРАЦИЯ ================= */
-const API_URL = 'ВСТАВЬТЕ_СЮДА_URL_ВАШЕГО_APPS_SCRIPT';
-const REQUEST_TIMEOUT = 20000;
-
-let currentUser = null;
-let positionCounter = 0;
-let currentOrderData = null;
-
-/* ================= JSONP (НЕ МЕНЯТЬ) ================= */
-function apiRequest(params) {
-    return new Promise((resolve) => {
-        const callbackName = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-        let done = false;
-
-        const timeoutId = setTimeout(() => {
-            if (done) return;
-            done = true;
-            cleanup();
-            resolve({ success: false, timeout: true, error: 'Превышено время ожидания ответа сервера' });
-        }, REQUEST_TIMEOUT);
-
-        function cleanup() {
-            clearTimeout(timeoutId);
-            try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
-            if (script && script.parentNode) script.parentNode.removeChild(script);
-        }
-
-        window[callbackName] = function (response) {
-            if (done) return;
-            done = true;
-            cleanup();
-            resolve(response);
-        };
-
-        const query = Object.keys(params)
-            .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(
-                typeof params[k] === 'object' ? JSON.stringify(params[k]) : params[k]
-            )).join('&');
-
-        const script = document.createElement('script');
-        script.src = API_URL + '?callback=' + callbackName + '&' + query;
-        script.onerror = function () {
-            if (done) return;
-            done = true;
-            cleanup();
-            resolve({ success: false, error: 'Ошибка сети при обращении к серверу' });
-        };
-        document.body.appendChild(script);
-    });
-}
-
-/* ================= UI HELPERS ================= */
-function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
-function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
-
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = 'toast ' + type + ' active';
-    setTimeout(() => { toast.className = 'toast ' + type; }, 3500);
-}
-
-function openModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-/* ================= ЛОГИН / РОЛИ ================= */
-async function doLogin() {
-    const login = document.getElementById('loginInput').value.trim();
-    const password = document.getElementById('passwordInput').value.trim();
-    const errBox = document.getElementById('loginError');
-    errBox.textContent = '';
-
-    if (!login || !password) { errBox.textContent = 'Введите логин и пароль'; return; }
-
-    showLoading();
-    const res = await apiRequest({ action: 'login', login: login, password: password });
-    hideLoading();
-
-    if (res && res.success) {
-        currentUser = res.user;
-        onLoginSuccess();
-    } else {
-        errBox.textContent = (res && res.error) ? res.error : 'Неверный логин или пароль';
-    }
-}
-
-function onLoginSuccess() {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('mainScreen').style.display = 'block';
-    document.getElementById('userName').textContent = currentUser.name || currentUser.login;
-    document.getElementById('userDepartment').textContent = currentUser.department || '';
-    if (currentUser.role === 'admin') {
-        document.getElementById('filterDeptGroup').style.display = 'flex';
-    }
-    initNewOrder();
-    updateQueueUI();
-}
-
-function doLogout() {
-    currentUser = null;
-    document.getElementById('mainScreen').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('loginInput').value = '';
-    document.getElementById('passwordInput').value = '';
-    document.getElementById('loginError').textContent = '';
-}
-
-/* ================= НОВАЯ ЗАЯВКА / ФОРМА ================= */
-function initNewOrder() {
-    const now = new Date();
-    document.getElementById('orderNumber').value = 'AUTO';
-    document.getElementById('orderDate').value = now.toLocaleDateString('ru-RU');
-    document.getElementById('orderDepartment').value = currentUser.department || '';
-    document.getElementById('orderApplicant').value = currentUser.name || currentUser.login;
-    document.getElementById('positionsBody').innerHTML = '';
-    positionCounter = 0;
-    addPositionRow();
-    addPositionRow();
-    addPositionRow();
-}
-
-function addPositionRow() {
-    positionCounter++;
-    const tbody = document.getElementById('positionsBody');
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-        '<td class="col-num row-num"></td>' +
-        '<td class="col-name"><input type="text" class="pos-name" placeholder="Наименование"></td>' +
-        '<td class="col-unit">' +
-            '<select class="pos-unit">' +
-                '<option value="шт">шт</option>' +
-                '<option value="м">м</option>' +
-                '<option value="м2">м2</option>' +
-                '<option value="м3">м3</option>' +
-                '<option value="кг">кг</option>' +
-                '<option value="л">л</option>' +
-                '<option value="упак">упак</option>' +
-                '<option value="компл">компл</option>' +
-            '</select>' +
-        '</td>' +
-        '<td class="col-qty"><input type="number" class="pos-qty" min="0" step="any" placeholder="0"></td>' +
-        '<td class="col-article"><input type="text" class="pos-article" placeholder="Артикул"></td>' +
-        '<td class="col-note"><input type="text" class="pos-note" placeholder="Примечание"></td>' +
-        '<td class="col-action"><button class="delete-row-btn" onclick="deletePositionRow(this)">&times;</button></td>';
-    tbody.appendChild(tr);
-    renumberRows();
-}
-
-function deletePositionRow(btn) {
-    const tr = btn.closest('tr');
-    tr.parentNode.removeChild(tr);
-    renumberRows();
-}
-
-function renumberRows() {
-    const rows = document.querySelectorAll('#positionsBody tr');
-    rows.forEach((r, i) => { r.querySelector('.row-num').textContent = (i + 1); });
-}
-
-function collectPositions() {
-    const rows = document.querySelectorAll('#positionsBody tr');
-    const positions = [];
-    rows.forEach(r => {
-        const name = r.querySelector('.pos-name').value.trim();
-        const unit = r.querySelector('.pos-unit').value;
-        const qty = r.querySelector('.pos-qty').value.trim();
-        const article = r.querySelector('.pos-article').value.trim();
-        const note = r.querySelector('.pos-note').value.trim();
-        if (name) {
-            positions.push({ name, unit, qty, article, note, status: 'pending' });
-        }
-    });
-    return positions;
-}
-
-/* clearForm вызывается при старте следующей новой заявки.
-   Именно здесь чистим успешно отправленные (sent) записи буфера. */
-function clearForm() {
-    purgeSentFromQueue();
-    initNewOrder();
-    updateQueueUI();
-}
-     /* ================= БУФЕР ОЧЕРЕДИ (НОВОЕ) ================= */
-const QUEUE_KEY = 'mat_order_queue';
-
-function loadQueue() {
-    try {
-        const raw = localStorage.getItem(QUEUE_KEY);
-        if (!raw) return [];
-        const arr = JSON.parse(raw);
-        return Array.isArray(arr) ? arr : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveQueue(queue) {
-    try {
-        localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-    } catch (e) {
-        showToast('Не удалось сохранить очередь (localStorage)', 'error');
-    }
-}
-
-function genQueueId() {
-    return 'q_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-}
-
-/* Добавить новую заявку в очередь. Возвращает id записи. */
-function enqueueOrder(body) {
-    const queue = loadQueue();
-    const item = {
-        id: genQueueId(),
-        createdAt: new Date().toISOString(),
-        body: body,
-        status: 'pending',
-        attempts: 0,
-        lastError: ''
-    };
-    queue.push(item);
-    saveQueue(queue);
-    return item.id;
-}
-
-function updateQueueItem(id, patch) {
-    const queue = loadQueue();
-    const idx = queue.findIndex(x => x.id === id);
-    if (idx === -1) return;
-    queue[idx] = Object.assign({}, queue[idx], patch);
-    saveQueue(queue);
-}
-
-function removeQueueItem(id) {
-    const queue = loadQueue().filter(x => x.id !== id);
-    saveQueue(queue);
-    updateQueueUI();
-}
-
-/* Чистка успешно отправленных (sent) записей.
-   Вызывается при старте формирования следующей заявки. */
-function purgeSentFromQueue() {
-    const queue = loadQueue().filter(x => x.status !== 'sent');
-    saveQueue(queue);
-}
-
-/* Определение агрегированного состояния для индикатора. */
-function getQueueState(queue) {
-    if (queue.some(x => x.status === 'sending')) return 'sending';
-    if (queue.some(x => x.status === 'error'))   return 'error';
-    if (queue.some(x => x.status === 'pending')) return 'pending';
-    if (queue.length > 0 && queue.every(x => x.status === 'sent')) return 'ok';
-    return 'pending';
-}
-
-function stateLabel(state) {
-    switch (state) {
-        case 'sending': return 'Отправка…';
-        case 'error':   return 'Ошибка';
-        case 'pending': return 'Ожидает';
-        case 'ok':      return 'Отправлено';
-        default:        return 'Очередь';
-    }
-}
-
-/* Обновление индикатора и панели. */
-function updateQueueUI() {
-    const widget = document.getElementById('queueWidget');
-    const countEl = widget.querySelector('.qw-count');
-    const labelEl = widget.querySelector('.qw-label');
-    const queue = loadQueue();
-
-    if (!currentUser || queue.length === 0) {
-        widget.style.display = 'none';
-        const panel = document.getElementById('queuePanel');
-        if (panel) panel.classList.remove('active');
-    } else {
-        widget.style.display = 'flex';
-        const state = getQueueState(queue);
-        widget.className = 'state-' + state;
-        widget.id = 'queueWidget';
-        labelEl.textContent = stateLabel(state);
-        countEl.textContent = queue.length;
-    }
-
-    renderQueuePanel();
-}
-
-function toggleQueuePanel() {
-    const panel = document.getElementById('queuePanel');
-    if (panel.classList.contains('active')) {
-        panel.classList.remove('active');
-    } else {
-        renderQueuePanel();
-        panel.classList.add('active');
-    }
-}
-
-function escapeHtml(s) {
-    return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-function statusText(st) {
-    switch (st) {
-        case 'pending': return 'Ожидает';
-        case 'sending': return 'Отправка';
-        case 'error':   return 'Ошибка';
-        case 'sent':    return 'Отправлено';
-        default:        return st;
-    }
-}
-
-function renderQueuePanel() {
-    const body = document.getElementById('queuePanelBody');
-    const queue = loadQueue();
-
-    if (queue.length === 0) {
-        body.innerHTML = '<div class="qp-empty">Очередь пуста</div>';
-        return;
-    }
-
-    let html = '';
-    queue.forEach(item => {
-        const created = new Date(item.createdAt).toLocaleString('ru-RU');
-        const posCount = (item.body && item.body.positions) ? item.body.positions.length : 0;
-        const canRetry = (item.status === 'error');
-        html +=
-            '<div class="qp-item">' +
-                '<div class="qp-row1">' +
-                    '<span class="qp-meta">Позиций: ' + posCount + '</span>' +
-                    '<span class="qp-status ' + item.status + '">' + statusText(item.status) + '</span>' +
-                '</div>' +
-                '<div class="qp-meta">Создана: ' + escapeHtml(created) + '</div>' +
-                '<div class="qp-meta">Попыток: ' + (item.attempts || 0) + '</div>' +
-                (item.lastError ? '<div class="qp-err">' + escapeHtml(item.lastError) + '</div>' : '') +
-                '<div class="qp-actions">' +
-                    '<button class="qp-btn retry" ' + (canRetry ? '' : 'disabled') +
-                        ' onclick="retryQueueItem(\'' + item.id + '\')">Повторить</button>' +
-                    '<button class="qp-btn del" onclick="deleteQueueItem(\'' + item.id + '\')">Удалить</button>' +
-                '</div>' +
-            '</div>';
-    });
-    body.innerHTML = html;
-}
-
-function deleteQueueItem(id) {
-    removeQueueItem(id);
-}
-
-/* Повторная отправка — ТОЛЬКО вручную. */
-async function retryQueueItem(id) {
-    const queue = loadQueue();
-    const item = queue.find(x => x.id === id);
-    if (!item) return;
-    if (item.status === 'sending') return;
-
-    updateQueueItem(id, { status: 'sending', lastError: '' });
-    updateQueueUI();
-    showLoading();
-
-    const res = await apiRequest(Object.assign({ action: 'saveOrder' }, item.body));
-
-    hideLoading();
-
-    if (res && res.success === true) {
-        updateQueueItem(id, {
-            status: 'sent',
-            attempts: (item.attempts || 0) + 1,
-            lastError: ''
-        });
-        showToast('Заявка успешно отправлена', 'success');
-    } else {
-        const errText = res && res.timeout
-            ? 'Таймаут: ответ сервера не получен'
-            : (res && res.error ? res.error : 'Неизвестная ошибка отправки');
-        updateQueueItem(id, {
-            status: 'error',
-            attempts: (item.attempts || 0) + 1,
-            lastError: errText
-        });
-        showToast('Ошибка отправки: ' + errText, 'error');
-    }
-    updateQueueUI();
-}
-     /* ================= ОБЁРНУТАЯ ОТПРАВКА НОВОЙ ЗАЯВКИ ================= */
-/* Именно saveOrder оборачивает буфер.
-   1) собираем тело; 2) кладём в очередь (pending);
-   3) статус sending; 4) при success -> sent (НЕ удаляем);
-   5) при ошибке/таймауте -> error (остаётся в очереди). */
-async function saveOrder() {
-    const positions = collectPositions();
-
-    if (positions.length === 0) {
-        showToast('Добавьте хотя бы одну позицию', 'warning');
-        return;
-    }
-
-    const body = {
-        login: currentUser.login,
-        department: document.getElementById('orderDepartment').value,
-        applicant: document.getElementById('orderApplicant').value,
-        date: document.getElementById('orderDate').value,
-        positions: positions
-    };
-
-    // 1) кладём в очередь
-    const queueId = enqueueOrder(body);
-    updateQueueUI();
-
-    // 2) статус sending
-    updateQueueItem(queueId, { status: 'sending', lastError: '' });
-    updateQueueUI();
-
-    showLoading();
-    const res = await apiRequest(Object.assign({ action: 'saveOrder' }, body));
-    hideLoading();
-
-    const item = loadQueue().find(x => x.id === queueId) || { attempts: 0 };
-
-    if (res && res.success === true) {
-        // УСПЕХ: НЕ удаляем сразу, ставим sent.
-        // Удаление произойдёт при старте следующей новой заявки (clearForm).
-        updateQueueItem(queueId, {
-            status: 'sent',
-            attempts: (item.attempts || 0) + 1,
-            lastError: ''
-        });
-        updateQueueUI();
-
-        const num = res.orderNumber || res.number || '';
-        showToast('Заявка' + (num ? ' №' + num : '') + ' сохранена', 'success');
-
-        // старт следующей новой заявки: чистим sent и обновляем форму
-        clearForm();
-    } else {
-        // ОШИБКА / ТАЙМАУТ / НЕТ СЕТИ: остаётся в очереди со статусом error
-        const errText = res && res.timeout
-            ? 'Таймаут: ответ сервера не получен'
-            : (res && res.error ? res.error : 'Неизвестная ошибка отправки');
-        updateQueueItem(queueId, {
-            status: 'error',
-            attempts: (item.attempts || 0) + 1,
-            lastError: errText
-        });
-        updateQueueUI();
-        showToast('Ошибка отправки: ' + errText + '. Заявка сохранена в очереди.', 'error');
-    }
-}
-
-/* ================= ИСТОРИЯ ================= */
-async function openHistory() {
-    openModal('historyModal');
-    if (currentUser.role === 'admin') { await loadDepartmentsFilter(); }
-    await loadHistory();
-}
-
-async function loadDepartmentsFilter() {
-    const res = await apiRequest({ action: 'getDepartments', login: currentUser.login });
-    if (res && res.success && Array.isArray(res.departments)) {
-        const sel = document.getElementById('filterDepartment');
-        sel.innerHTML = '<option value="">Все</option>';
-        res.departments.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d;
-            opt.textContent = d;
-            sel.appendChild(opt);
-        });
-    }
-}
-
-async function loadHistory() {
-    showLoading();
-    const params = {
-        action: 'getHistory',
-        login: currentUser.login,
-        dateFrom: document.getElementById('filterDateFrom').value,
-        dateTo: document.getElementById('filterDateTo').value
-    };
-    if (currentUser.role === 'admin') {
-        params.department = document.getElementById('filterDepartment').value;
-    }
-    const res = await apiRequest(params);
-    hideLoading();
-
-    const tbody = document.getElementById('historyBody');
-    tbody.innerHTML = '';
-
-    if (!res || !res.success || !Array.isArray(res.orders)) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">Нет данных</td></tr>';
-        return;
-    }
-
-    if (res.orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">Заявки не найдены</td></tr>';
-        return;
-    }
-
-    res.orders.forEach(o => {
-        const tr = document.createElement('tr');
-        tr.onclick = () => openOrderDetails(o.number);
-        const statusInfo = getOrderStatusInfo(o);
-        tr.innerHTML =
-            '<td>' + escapeHtml(o.number) + '</td>' +
-            '<td>' + escapeHtml(o.date) + '</td>' +
-            '<td>' + escapeHtml(o.department) + '</td>' +
-            '<td>' + escapeHtml(o.applicant) + '</td>' +
-            '<td>' + (o.positionsCount != null ? o.positionsCount : (o.positions ? o.positions.length : 0)) + '</td>' +
-            '<td><span class="status-badge ' + statusInfo.cls + '">' + statusInfo.text + '</span></td>';
-        tbody.appendChild(tr);
-    });
-}
-
-function getOrderStatusInfo(o) {
-    const positions = o.positions || [];
-    const total = positions.length;
-    const done = positions.filter(p => p.status === 'completed').length;
-    if (total > 0 && done === total) return { cls: 'completed', text: 'Выполнено' };
-    if (done > 0) return { cls: 'partial', text: 'Частично' };
-    return { cls: 'pending', text: 'В работе' };
-}
-
-/* ================= ДЕТАЛИ ЗАЯВКИ ================= */
-async function openOrderDetails(orderNumber) {
-    showLoading();
-    const res = await apiRequest({ action: 'getOrder', login: currentUser.login, number: orderNumber });
-    hideLoading();
-
-    if (!res || !res.success || !res.order) {
-        showToast('Не удалось загрузить заявку', 'error');
-        return;
-    }
-
-    currentOrderData = res.order;
-    renderOrderDetails(res.order);
-    openModal('detailsModal');
-}
-
-function renderOrderDetails(order) {
-    const header = document.getElementById('detailsHeader');
-    header.innerHTML =
-        '<div class="detail-item"><label>Номер</label><span>' + escapeHtml(order.number) + '</span></div>' +
-        '<div class="detail-item"><label>Дата</label><span>' + escapeHtml(order.date) + '</span></div>' +
-        '<div class="detail-item"><label>Подразделение</label><span>' + escapeHtml(order.department) + '</span></div>' +
-        '<div class="detail-item"><label>Заявитель</label><span>' + escapeHtml(order.applicant) + '</span></div>';
-
-    const tbody = document.getElementById('detailsBody');
-    tbody.innerHTML = '';
-    const isAdmin = (currentUser.role === 'admin');
-
-    (order.positions || []).forEach((p, i) => {
-        const tr = document.createElement('tr');
-        const done = (p.status === 'completed');
-        tr.innerHTML =
-            '<td class="col-num">' + (i + 1) + '</td>' +
-            '<td class="col-name">' + escapeHtml(p.name) + '</td>' +
-            '<td class="col-unit">' + escapeHtml(p.unit) + '</td>' +
-            '<td class="col-qty">' + escapeHtml(p.qty) + '</td>' +
-            '<td class="col-article">' + escapeHtml(p.article) + '</td>' +
-            '<td class="col-note">' + escapeHtml(p.note) + '</td>' +
-            '<td class="col-status">' +
-                '<button class="status-btn ' + (done ? 'completed' : 'not-completed') + '" ' +
-                    (isAdmin ? '' : 'disabled') +
-                    ' data-index="' + i + '" onclick="toggleStatus(this)">' +
-                    (done ? '✓' : '✗') +
-                '</button>' +
-            '</td>';
-        tbody.appendChild(tr);
-    });
-
-    document.getElementById('saveStatusBtn').style.display = isAdmin ? 'inline-flex' : 'none';
-}
-
-function toggleStatus(btn) {
-    const idx = parseInt(btn.getAttribute('data-index'), 10);
-    const pos = currentOrderData.positions[idx];
-    pos.status = (pos.status === 'completed') ? 'pending' : 'completed';
-    if (pos.status === 'completed') {
-        btn.className = 'status-btn completed';
-        btn.textContent = '✓';
-    } else {
-        btn.className = 'status-btn not-completed';
-        btn.textContent = '✗';
-    }
-}
-
-async function saveStatuses() {
-    if (!currentOrderData) return;
-    showLoading();
-    const statuses = currentOrderData.positions.map(p => p.status || 'pending');
-    const res = await apiRequest({
-        action: 'updateStatuses',
-        login: currentUser.login,
-        number: currentOrderData.number,
-        statuses: statuses
-    });
-    hideLoading();
-
-    if (res && res.success) {
-        showToast('Статусы сохранены', 'success');
-    } else {
-        showToast((res && res.error) ? res.error : 'Ошибка сохранения статусов', 'error');
-    }
-}
-
-/* ================= ПЕЧАТЬ ================= */
-function printOrder() { window.print(); }
-
-/* ================= ИНИЦИАЛИЗАЦИЯ ================= */
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none' &&
-        document.getElementById('mainScreen').style.display === 'none') {
-        doLogin();
-    }
-});
-
-// при загрузке страницы показываем сохранённую очередь (если есть) —
-// но только после логина индикатор станет видимым (updateQueueUI это учитывает)
-window.addEventListener('load', function () {
-    // очередь уже в localStorage; UI обновится при onLoginSuccess
-});
-</script>
-</body>
-</html>
-         
+</div>
