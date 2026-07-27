@@ -1,6 +1,15 @@
 <!-- ============================================================
-     INDEX.HTML - доработка: буфер очереди отправки заявок
-     База: версия 2.3. Изменения: только добавление очереди.
+     INDEX.HTML - версия 3.0
+     Изменения относительно 2.3:
+       1. История подгружается порциями по 15 заявок
+       2. Очередь отправки до 3 заявок с автоматической досылкой
+       3. Отметка "Просмотрено" по заявке (ставит администратор)
+       4. Общий пул: все подразделения видят все заявки
+       5. Дата регистрации берётся с компьютера пользователя
+       6. Приватные заявки администратора (чекбокс)
+       7. Анимация отправки (бегущая полоса)
+       8. Экранирование данных, исправления из прошлого разбора
+     Оформление и палитра не изменены.
      ============================================================ -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -181,6 +190,8 @@ body {
 }
 
 .btn-danger:hover { background: rgba(255, 107, 107, 0.3); }
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .order-form {
     background: rgba(255, 255, 255, 0.05);
@@ -507,20 +518,20 @@ body {
 @media print {
     body { background: white !important; color: black !important; }
     .login-container, .header, .form-actions, .modal-overlay, .btn,
-    .delete-row-btn, .add-row-btn, .loading-overlay, .toast { display: none !important; }
+    .delete-row-btn, .add-row-btn, .loading-overlay, .toast,
+    .queue-indicator, .send-progress { display: none !important; }
     .main-container { display: block !important; padding: 0; max-width: none; }
     .order-form { background: white; border: none; padding: 0; }
 }
 
 /* ============================================================
-   ДОБАВЛЕНО: буфер очереди отправки (индикатор + модалка)
-   Новые стили в стиле тёмной темы. Существующие не изменены.
+   БУФЕР ОЧЕРЕДИ ОТПРАВКИ (индикатор + модалка)
    ============================================================ */
 .queue-indicator {
     position: fixed;
     bottom: 30px;
     left: 30px;
-    z-index: 2500;
+    z-index: 900;
     display: none;
     align-items: center;
     gap: 10px;
@@ -584,11 +595,12 @@ body {
 .queue-item .qitem-main { flex-grow: 1; min-width: 0; }
 .queue-item .qitem-title { color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .queue-item .qitem-sub { color: #888; font-size: 12px; margin-bottom: 4px; word-break: break-word; }
-.queue-item .qitem-err { color: #ff6b6b; font-size: 12px; word-break: break-word; }
+.queue-item .qitem-err { color: #ff6b6b; font-size: 12px; word-break: break-word; margin-bottom: 4px; }
 
 .queue-item .qitem-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 .queue-item .qitem-actions .btn { padding: 8px 14px; font-size: 12px; }
-         .queue-item .qitem-status {
+
+.queue-item .qitem-status {
     display: inline-block;
     padding: 3px 10px;
     border-radius: 20px;
@@ -603,15 +615,81 @@ body {
 .queue-item .qitem-status.sent    { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
 
 .queue-empty { text-align: center; padding: 40px; color: #888; }
+.queue-hint { color: #ffc107; font-size: 13px; margin-bottom: 15px; text-align: center; }
+
+/* Бегущая полоса отправки */
+.send-progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    z-index: 3500;
+    display: none;
+}
+.send-progress.active { display: block; }
+.send-progress::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 35%;
+    background: linear-gradient(90deg, rgba(0,212,255,0) 0%, #00d4ff 40%, #00ff88 60%, rgba(0,255,136,0) 100%);
+    animation: sendRun 1.3s linear infinite;
+}
+@keyframes sendRun {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(400%); }
+}
+
+/* Отметка "просмотрено" */
+.status-btn.viewed {
+    background: rgba(0, 212, 255, 0.3);
+    color: #00d4ff;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+}
+.status-btn.not-viewed {
+    background: rgba(255, 255, 255, 0.08);
+    color: #888;
+}
+.history-table .col-viewed { width: 80px; text-align: center; }
+.history-table .col-viewed .status-btn { margin: 0 auto; }
+
+/* Кнопка "Загрузить ещё" */
+.load-more-wrap { text-align: center; margin-top: 20px; }
+.history-counter { text-align: center; color: #888; font-size: 12px; margin-top: 12px; }
+
+/* Чекбокс приватной заявки администратора */
+.private-toggle {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #aaa;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+.private-toggle.visible { display: flex; }
+.private-toggle input { width: 18px; height: 18px; cursor: pointer; accent-color: #00d4ff; }
 
 @media (max-width: 768px) {
     .queue-indicator { bottom: 20px; left: 20px; }
     .queue-item { flex-direction: column; }
     .queue-item .qitem-actions { flex-direction: row; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+    .send-progress::before { animation: none; width: 100%; opacity: 0.5; }
+    .queue-indicator.state-sending .qi-dot { animation: none; }
+}
     </style>
 </head>
 <body>
+
+<div class="send-progress" id="sendProgress"></div>
 
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner"></div>
@@ -669,6 +747,13 @@ body {
                 <label>Создал заявку</label>
                 <select id="orderCreatedBy"><option value="">Выберите...</option></select>
             </div>
+            <div class="form-group" id="privateGroup" style="display:none;">
+                <label>Видимость</label>
+                <label class="private-toggle visible" id="privateToggle">
+                    <input type="checkbox" id="orderPrivate">
+                    <span>Только для меня</span>
+                </label>
+            </div>
         </div>
 
         <div class="positions-section">
@@ -678,7 +763,7 @@ body {
                     <thead>
                         <tr>
                             <th class="col-num">№</th>
-                            <th class="col-name">Наименование材料</th>
+                            <th class="col-name">Наименование материала</th>
                             <th class="col-unit">Ед. изм.</th>
                             <th class="col-qty">Кол-во</th>
                             <th class="col-article">Артикул/Код</th>
@@ -697,10 +782,11 @@ body {
             </button>
             <div style="flex-grow: 1;"></div>
             <button class="btn btn-secondary" onclick="clearForm()">🗑️ Очистить</button>
-            <button class="btn btn-primary" onclick="saveOrder()">💾 Сохранить заявку</button>
+            <button class="btn btn-primary" id="saveOrderBtn" onclick="saveOrder()">💾 Сохранить заявку</button>
         </div>
     </div>
 </div>
+
 <div class="modal-overlay" id="historyModal">
     <div class="modal">
         <div class="modal-header">
@@ -711,13 +797,13 @@ body {
             <div class="history-filters">
                 <div class="form-group">
                     <label>Подразделение</label>
-                    <select id="filterDepartment" onchange="loadHistory()">
+                    <select id="filterDepartment" onchange="loadHistory(false)">
                         <option value="">Все</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Дата</label>
-                    <input type="date" id="filterDate" onchange="loadHistory()">
+                    <input type="date" id="filterDate" onchange="loadHistory(false)">
                 </div>
                 <div class="form-group" style="align-self: flex-end;">
                     <button class="btn btn-secondary" onclick="clearFilters()">Сбросить</button>
@@ -735,6 +821,7 @@ body {
                             <th>Категория</th>
                             <th>Создал</th>
                             <th>Статус</th>
+                            <th class="col-viewed">Просм.</th>
                         </tr>
                     </thead>
                     <tbody id="historyBody"></tbody>
@@ -744,6 +831,11 @@ body {
             <div id="historyEmpty" style="text-align: center; padding: 40px; color: #888; display: none;">
                 Заявки не найдены
             </div>
+
+            <div class="load-more-wrap" id="loadMoreWrap" style="display:none;">
+                <button class="btn btn-secondary" onclick="loadHistory(true)">⬇️ Загрузить ещё 15</button>
+            </div>
+            <div class="history-counter" id="historyCounter"></div>
         </div>
     </div>
 </div>
@@ -780,6 +872,10 @@ body {
                     <label>Создал заявку</label>
                     <span id="detailCreatedBy">-</span>
                 </div>
+                <div class="detail-item">
+                    <label>Просмотрено</label>
+                    <span id="detailViewedWrap"></span>
+                </div>
             </div>
 
             <div class="positions-table-container">
@@ -807,14 +903,12 @@ body {
     </div>
 </div>
 
-<!-- ДОБАВЛЕНО: плавающий индикатор очереди отправки -->
 <div class="queue-indicator" id="queueIndicator" onclick="openQueueModal()">
     <span class="qi-dot"></span>
     <span class="qi-text" id="queueIndicatorText">Очередь</span>
     <span class="qi-count" id="queueIndicatorCount">0</span>
 </div>
 
-<!-- ДОБАВЛЕНО: модалка со списком очереди -->
 <div class="modal-overlay" id="queueModal">
     <div class="modal" style="max-width: 700px;">
         <div class="modal-header">
@@ -822,14 +916,17 @@ body {
             <button class="modal-close" onclick="closeQueueModal()">✕</button>
         </div>
         <div class="modal-body">
+            <div class="queue-hint" id="queueHint" style="display:none;"></div>
             <div class="queue-list" id="queueListBody"></div>
             <div class="queue-empty" id="queueEmpty" style="display:none;">Очередь пуста</div>
         </div>
         <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="clearSentQueue()">🧹 Убрать отправленные</button>
             <button class="btn btn-primary" onclick="closeQueueModal()">Закрыть</button>
         </div>
     </div>
 </div>
+
 <script>
 // ============================================================
 // КОНФИГУРАЦИЯ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
@@ -837,19 +934,40 @@ body {
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwCMXnkBgheVwoTcwkwq85mVAK9KpXJ_o-FNCTJH6p16_ScPFbMfOuSai5AfENC9IOE/exec';
 
-const API_TIMEOUT = 180000; // 3 минуты - для всех запросов
+const API_TIMEOUT = 180000;      // 3 минуты
+const QUEUE_STORAGE_KEY = 'pendingRequests';
+const MAX_UNSENT = 3;            // максимум неотправленных заявок в очереди
+const MAX_SENT_KEPT = 10;        // сколько отправленных держим в списке
+const HISTORY_PAGE = 15;         // сколько заявок грузим за раз
+const RETRY_DELAYS = [30000, 60000, 120000];  // автоповтор: 30с, 60с, 120с
 
 let currentUser = { role: '', department: '', employees: [], password: '' };
-let settings = { units: [], categories: [], departments: [] };
+let settings = { units: [], categories: [], departments: [], allDepartments: [] };
 let currentOrderId = null;
+let currentOrderViewed = 0;
 let positionRowCount = 0;
 
-// ДОБАВЛЕНО: ключ хранения очереди в localStorage
-const QUEUE_STORAGE_KEY = 'pendingRequests';
+let historyOffset = 0;
+let historyTotal = 0;
+let historyLoading = false;
+
+let queueWorkerBusy = false;
+let queueRetryTimer = null;
+let toastTimer = null;
 
 // ============================================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================================
+
+// Экранирование текста перед вставкой в HTML
+function esc(value) {
+    return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 function showLoading() { document.getElementById('loadingOverlay').classList.add('active'); }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
@@ -858,7 +976,8 @@ function showToast(message, type) {
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.className = 'toast ' + (type || 'success') + ' active';
-    setTimeout(function() { toast.classList.remove('active'); }, 4000);
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { toast.classList.remove('active'); }, 4000);
 }
 
 function formatDate(date) {
@@ -872,7 +991,7 @@ function formatDate(date) {
 }
 
 // ============================================================
-// API ЗАПРОСЫ (JSONP) - без изменений
+// API ЗАПРОСЫ (JSONP)
 // ============================================================
 
 function apiRequest(params) {
@@ -891,33 +1010,21 @@ function apiRequest(params) {
 
         function cleanup() {
             isResolved = true;
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-            try {
-                delete window[callbackName];
-            } catch (e) {
-                window[callbackName] = undefined;
-            }
-            if (script && script.parentNode) {
-                script.parentNode.removeChild(script);
-            }
+            if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+            try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
+            if (script && script.parentNode) script.parentNode.removeChild(script);
         }
 
         window[callbackName] = function(data) {
-            if (!isResolved) {
-                resolve(data);
-                cleanup();
-            }
+            if (!isResolved) { resolve(data); cleanup(); }
         };
 
         timeoutId = setTimeout(function() {
             if (!isResolved) {
-                console.warn('API запрос превысил таймаут (' + (API_TIMEOUT/1000) + ' сек). Действие:', params.action);
+                console.warn('Таймаут запроса (' + (API_TIMEOUT / 1000) + ' с). Действие:', params.action);
                 resolve({
                     success: false,
-                    error: 'Сервер долго отвечает. Возможно, данные сохранены - проверьте историю заявок.',
+                    error: 'Сервер долго отвечает. Проверьте историю заявок.',
                     timeout: true
                 });
                 cleanup();
@@ -928,7 +1035,7 @@ function apiRequest(params) {
         script.src = url.toString();
         script.onerror = function() {
             if (!isResolved) {
-                resolve({ success: false, error: 'Ошибка соединения с сервером' });
+                resolve({ success: false, error: 'Нет связи с сервером' });
                 cleanup();
             }
         };
@@ -937,7 +1044,7 @@ function apiRequest(params) {
 }
 
 // ============================================================
-// АВТОРИЗАЦИЯ - без изменений
+// АВТОРИЗАЦИЯ
 // ============================================================
 
 async function handleLogin() {
@@ -952,30 +1059,44 @@ async function handleLogin() {
     showLoading();
     errorDiv.textContent = '';
 
-    const result = await apiRequest({ action: 'login', password: password });
+    // Один запрос вместо двух: login + настройки сразу
+    const result = await apiRequest({ action: 'init', password: password });
     hideLoading();
 
     if (result.success) {
-        currentUser = {
-            role: result.role,
-            department: result.department,
-            employees: result.employees || [],
-            password: password
-        };
-        sessionStorage.setItem('user', JSON.stringify(currentUser));
-        await loadSettings();
+        applyInitResult(result, password);
         showMainScreen();
         showToast('Добро пожаловать!', 'success');
+        queueProcess();
     } else {
-        if (result.timeout) {
-            errorDiv.textContent = 'Сервер не отвечает. Попробуйте позже.';
-        } else {
-            errorDiv.textContent = result.error || 'Неверный пароль';
-        }
+        errorDiv.textContent = result.timeout
+            ? 'Сервер не отвечает. Попробуйте ещё раз.'
+            : (result.error || 'Неверный пароль');
     }
 }
 
+function applyInitResult(result, password) {
+    currentUser = {
+        role: result.role,
+        department: result.department,
+        employees: result.employees || [],
+        password: password
+    };
+    settings = {
+        units: result.units || [],
+        categories: result.categories || [],
+        departments: result.departments || [],
+        allDepartments: result.allDepartments || result.departments || []
+    };
+    sessionStorage.setItem('user', JSON.stringify(currentUser));
+    populateSelects();
+}
+
 function handleLogout() {
+    const unsent = queueUnsentCount();
+    if (unsent > 0 && !confirm('В очереди ' + unsent + ' неотправленных заявок. Они останутся в памяти браузера и уйдут после следующего входа. Выйти?')) {
+        return;
+    }
     sessionStorage.removeItem('user');
     currentUser = { role: '', department: '', employees: [], password: '' };
     document.getElementById('mainScreen').style.display = 'none';
@@ -987,101 +1108,75 @@ function handleLogout() {
 
 async function checkSession() {
     const savedUser = sessionStorage.getItem('user');
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        showLoading();
-        const result = await apiRequest({ action: 'login', password: currentUser.password });
-        hideLoading();
-        if (result.success) {
-            currentUser.employees = result.employees || currentUser.employees;
-            await loadSettings();
-            showMainScreen();
-        } else {
-            sessionStorage.removeItem('user');
-        }
-    }
-}
+    if (!savedUser) return;
+    try { currentUser = JSON.parse(savedUser); } catch (e) { return; }
 
-// ============================================================
-// ЗАГРУЗКА НАСТРОЕК - без изменений
-// ============================================================
-
-async function loadSettings() {
     showLoading();
-    const result = await apiRequest({ action: 'getSettings', password: currentUser.password });
+    const result = await apiRequest({ action: 'init', password: currentUser.password });
     hideLoading();
 
     if (result.success) {
-        settings = {
-            units: result.units || [],
-            categories: result.categories || [],
-            departments: result.departments || []
-        };
-        currentUser.employees = result.employees || currentUser.employees;
-        currentUser.department = result.department || currentUser.department;
-        populateSelects();
+        applyInitResult(result, currentUser.password);
+        showMainScreen();
+        queueProcess();
     } else {
-        if (result.timeout) {
-            showToast('Сервер долго отвечает. Попробуйте обновить страницу.', 'warning');
-        } else {
-            showToast('Ошибка загрузки настроек: ' + (result.error || ''), 'error');
-        }
+        sessionStorage.removeItem('user');
     }
 }
 
+// ============================================================
+// СПРАВОЧНИКИ
+// ============================================================
+
 function populateSelects() {
+    var isAdmin = currentUser.role === 'admin';
+
     var deptSelect = document.getElementById('orderDepartment');
     deptSelect.innerHTML = '';
-
-    if (currentUser.role === 'admin') {
+    if (isAdmin) {
         deptSelect.disabled = false;
         settings.departments.forEach(function(dept) {
-            deptSelect.innerHTML += '<option value="' + dept + '">' + dept + '</option>';
+            deptSelect.innerHTML += '<option value="' + esc(dept) + '">' + esc(dept) + '</option>';
         });
     } else {
         deptSelect.disabled = true;
-        deptSelect.innerHTML = '<option value="' + currentUser.department + '">' + currentUser.department + '</option>';
+        deptSelect.innerHTML = '<option value="' + esc(currentUser.department) + '">' + esc(currentUser.department) + '</option>';
     }
 
     var catSelect = document.getElementById('orderCategory');
     catSelect.innerHTML = '<option value="">Выберите...</option>';
     settings.categories.forEach(function(cat) {
-        catSelect.innerHTML += '<option value="' + cat + '">' + cat + '</option>';
+        catSelect.innerHTML += '<option value="' + esc(cat) + '">' + esc(cat) + '</option>';
     });
 
     var createdBySelect = document.getElementById('orderCreatedBy');
     createdBySelect.innerHTML = '<option value="">Выберите...</option>';
     currentUser.employees.forEach(function(emp) {
-        createdBySelect.innerHTML += '<option value="' + emp + '">' + emp + '</option>';
+        createdBySelect.innerHTML += '<option value="' + esc(emp) + '">' + esc(emp) + '</option>';
     });
 
+    // Общий пул: фильтр по подразделениям доступен всем
     var filterDeptSelect = document.getElementById('filterDepartment');
     filterDeptSelect.innerHTML = '<option value="">Все</option>';
-    if (currentUser.role === 'admin') {
-        filterDeptSelect.disabled = false;
-        settings.departments.forEach(function(dept) {
-            filterDeptSelect.innerHTML += '<option value="' + dept + '">' + dept + '</option>';
-        });
-    } else {
-        filterDeptSelect.disabled = true;
-    }
-}
+    filterDeptSelect.disabled = false;
+    settings.allDepartments.forEach(function(dept) {
+        filterDeptSelect.innerHTML += '<option value="' + esc(dept) + '">' + esc(dept) + '</option>';
+    });
 
-// ============================================================
-// ГЛАВНЫЙ ЭКРАН - без изменений
-// ============================================================
+    // Приватная заявка - только для администратора
+    document.getElementById('privateGroup').style.display = isAdmin ? 'flex' : 'none';
+}
 
 function showMainScreen() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainScreen').style.display = 'block';
     document.getElementById('userDepartment').textContent =
         currentUser.role === 'admin' ? 'Администратор' : currentUser.department;
-    document.getElementById('orderDate').value = formatDate(new Date());
     clearForm();
 }
 
 // ============================================================
-// УПРАВЛЕНИЕ ПОЗИЦИЯМИ - без изменений
+// УПРАВЛЕНИЕ ПОЗИЦИЯМИ
 // ============================================================
 
 function addPositionRow(data) {
@@ -1099,18 +1194,18 @@ function addPositionRow(data) {
     var unitsOptions = '<option value="">-</option>';
     settings.units.forEach(function(unit) {
         var selected = (data && data.unit === unit) ? ' selected' : '';
-        unitsOptions += '<option value="' + unit + '"' + selected + '>' + unit + '</option>';
+        unitsOptions += '<option value="' + esc(unit) + '"' + selected + '>' + esc(unit) + '</option>';
     });
 
     var tr = document.createElement('tr');
     tr.setAttribute('data-row-id', positionRowCount);
     tr.innerHTML =
         '<td class="col-num">' + rowNum + '</td>' +
-        '<td class="col-name"><input type="text" placeholder="Наименование" value="' + (data ? data.name : '') + '"></td>' +
+        '<td class="col-name"><input type="text" placeholder="Наименование" value="' + esc(data ? data.name : '') + '"></td>' +
         '<td class="col-unit"><select>' + unitsOptions + '</select></td>' +
-        '<td class="col-qty"><input type="number" min="0" step="0.01" placeholder="0" value="' + (data ? data.quantity : '') + '"></td>' +
-        '<td class="col-article"><input type="text" placeholder="Артикул" value="' + (data ? data.article : '') + '"></td>' +
-        '<td class="col-note"><input type="text" placeholder="Примечание" value="' + (data ? data.note : '') + '"></td>' +
+        '<td class="col-qty"><input type="number" min="0" step="0.01" placeholder="0" value="' + esc(data ? data.quantity : '') + '"></td>' +
+        '<td class="col-article"><input type="text" placeholder="Артикул" value="' + esc(data ? data.article : '') + '"></td>' +
+        '<td class="col-note"><input type="text" placeholder="Примечание" value="' + esc(data ? data.note : '') + '"></td>' +
         '<td class="col-action"><button class="delete-row-btn" onclick="deletePositionRow(this)">✕</button></td>';
 
     tbody.appendChild(tr);
@@ -1163,18 +1258,21 @@ function clearForm() {
     document.getElementById('orderObject').value = '';
     document.getElementById('orderCategory').value = '';
     document.getElementById('orderCreatedBy').value = '';
+    document.getElementById('orderPrivate').checked = false;
     document.getElementById('positionsBody').innerHTML = '';
     positionRowCount = 0;
     addPositionRow();
 }
 
 // ============================================================
-// ДОБАВЛЕНО: БУФЕР ОЧЕРЕДИ ОТПРАВКИ ЗАЯВОК
-// Хранит заявки в localStorage. Статусы:
-//   pending  - создана, ожидает/в процессе
-//   sending  - идёт запрос
-//   error    - ошибка/таймаут, доступен ручной повтор
-//   sent     - успешно отправлена
+// БУФЕР ОЧЕРЕДИ ОТПРАВКИ
+//
+// Заявка сначала попадает в очередь в localStorage, затем
+// фоновый обработчик отправляет их по одной. Каждая заявка
+// несёт clientId - сервер по нему отсекает повторы, поэтому
+// автоматическая досылка не создаёт дублей.
+//
+// Статусы: pending -> sending -> sent | error
 // ============================================================
 
 function queueLoad() {
@@ -1198,10 +1296,8 @@ function queueSave(arr) {
 function queueAdd(item) {
     var arr = queueLoad();
     arr.push(item);
-    queueSave(arr);
-    renderQueueIndicator();
-    renderQueueList();
-    return item;
+    queueSave(queueTrim(arr));
+    renderQueue();
 }
 
 function queueUpdate(id, changes) {
@@ -1213,29 +1309,156 @@ function queueUpdate(id, changes) {
         }
     }
     queueSave(arr);
-    renderQueueIndicator();
-    renderQueueList();
+    renderQueue();
 }
 
 function queueRemove(id) {
-    var arr = queueLoad().filter(function(it) { return it.id !== id; });
-    queueSave(arr);
-    renderQueueIndicator();
-    renderQueueList();
+    queueSave(queueLoad().filter(function(it) { return it.id !== id; }));
+    renderQueue();
 }
 
-// Удаляет все успешно отправленные записи (вызывается
-// при создании следующей новой заявки)
-function queueClearSent() {
-    var arr = queueLoad().filter(function(it) { return it.status !== 'sent'; });
-    queueSave(arr);
+function queueGet(id) {
+    var arr = queueLoad();
+    for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) return arr[i]; }
+    return null;
+}
+
+// Оставляем в списке только последние отправленные, чтобы он не рос бесконечно
+function queueTrim(arr) {
+    var sent = arr.filter(function(it) { return it.status === 'sent'; });
+    if (sent.length <= MAX_SENT_KEPT) return arr;
+    var extra = sent.slice(0, sent.length - MAX_SENT_KEPT);
+    return arr.filter(function(it) { return extra.indexOf(it) === -1; });
+}
+
+function queueUnsentCount() {
+    return queueLoad().filter(function(it) { return it.status !== 'sent'; }).length;
+}
+
+function clearSentQueue() {
+    queueSave(queueLoad().filter(function(it) { return it.status !== 'sent'; }));
+    renderQueue();
+}
+
+// При загрузке страницы: зависшие "sending" возвращаем в очередь.
+// Повторная отправка безопасна - сервер отсечёт дубль по clientId.
+function queueRecoverStuck() {
+    var arr = queueLoad();
+    var changed = false;
+    arr.forEach(function(it) {
+        if (it.status === 'sending') {
+            it.status = 'pending';
+            it.lastError = '';
+            changed = true;
+        }
+    });
+    if (changed) queueSave(arr);
+}
+
+// ------------------------------------------------------------
+// Фоновый обработчик: отправляет заявки строго по одной
+// ------------------------------------------------------------
+
+async function queueProcess() {
+    if (queueWorkerBusy) return;
+    if (!currentUser.password) { renderQueue(); return; }
+
+    var arr = queueLoad();
+    var next = null;
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i].status === 'pending') { next = arr[i]; break; }
+    }
+    if (!next) { renderQueue(); return; }
+
+    queueWorkerBusy = true;
+    queueUpdate(next.id, { status: 'sending', lastError: '' });
+
+    var result = await apiRequest({
+        action: 'saveOrder',
+        password: currentUser.password,
+        clientId: next.id,
+        localDate: next.payload.localDate,
+        department: next.payload.department,
+        object: next.payload.object,
+        category: next.payload.category,
+        createdBy: next.payload.createdBy,
+        isPrivate: next.payload.isPrivate || '0',
+        positions: next.payload.positions
+    });
+
+    queueWorkerBusy = false;
+
+    if (result && result.success) {
+        queueUpdate(next.id, { status: 'sent', orderNumber: result.orderNumber, lastError: '' });
+        showToast('Заявка ' + result.orderNumber + ' записана', 'success');
+        setTimeout(queueProcess, 500);
+    } else {
+        var attempts = (next.attempts || 0) + 1;
+        var msg = (result && result.timeout)
+            ? 'Сервер долго отвечает. Повтор безопасен - дубля не будет.'
+            : ((result && result.error) || 'Нет связи с сервером');
+        queueUpdate(next.id, { status: 'error', lastError: msg, attempts: attempts });
+        showToast('Заявка не ушла: ' + msg, 'warning');
+        scheduleQueueRetry(attempts);
+    }
+}
+
+function scheduleQueueRetry(attempts) {
+    if (attempts > RETRY_DELAYS.length) return;   // дальше только вручную
+    var delay = RETRY_DELAYS[attempts - 1];
+    if (queueRetryTimer) clearTimeout(queueRetryTimer);
+    queueRetryTimer = setTimeout(function() {
+        queueRetryTimer = null;
+        var arr = queueLoad();
+        var changed = false;
+        arr.forEach(function(it) {
+            if (it.status === 'error' && (it.attempts || 0) <= RETRY_DELAYS.length) {
+                it.status = 'pending';
+                changed = true;
+            }
+        });
+        if (changed) { queueSave(arr); renderQueue(); }
+        queueProcess();
+    }, delay);
+}
+
+function retryQueueItem(id) {
+    if (!currentUser.password) {
+        showToast('Сначала войдите в систему', 'warning');
+        return;
+    }
+    queueUpdate(id, { status: 'pending', lastError: '', attempts: 0 });
+    queueProcess();
+}
+
+function removeQueueItem(id) {
+    var item = queueGet(id);
+    if (item && item.status !== 'sent') {
+        if (!confirm('Убрать заявку из очереди? Она не будет отправлена.')) return;
+    }
+    queueRemove(id);
+}
+
+// ------------------------------------------------------------
+// Отрисовка
+// ------------------------------------------------------------
+
+function renderQueue() {
+    renderQueueIndicator();
+    renderSendProgress();
+    if (document.getElementById('queueModal').classList.contains('active')) {
+        renderQueueList();
+    }
+}
+
+function renderSendProgress() {
+    var hasSending = queueLoad().some(function(it) { return it.status === 'sending'; });
+    document.getElementById('sendProgress').classList.toggle('active', hasSending);
 }
 
 function renderQueueIndicator() {
     var arr = queueLoad();
     var indicator = document.getElementById('queueIndicator');
-    var textEl = document.getElementById('queueIndicatorText');
-    var countEl = document.getElementById('queueIndicatorCount');
     if (!indicator) return;
 
     if (arr.length === 0) {
@@ -1246,35 +1469,47 @@ function renderQueueIndicator() {
     var hasSending = arr.some(function(it) { return it.status === 'sending'; });
     var hasError = arr.some(function(it) { return it.status === 'error'; });
     var hasPending = arr.some(function(it) { return it.status === 'pending'; });
+    var unsent = arr.filter(function(it) { return it.status !== 'sent'; }).length;
 
     indicator.classList.remove('state-sending', 'state-pending', 'state-error', 'state-sent');
 
     var label = 'Очередь';
     if (hasSending) { indicator.classList.add('state-sending'); label = 'Отправка...'; }
-    else if (hasError) { indicator.classList.add('state-error'); label = 'Есть ошибки'; }
+    else if (hasError) { indicator.classList.add('state-error'); label = 'Не ушло'; }
     else if (hasPending) { indicator.classList.add('state-pending'); label = 'Ожидание'; }
     else { indicator.classList.add('state-sent'); label = 'Отправлено'; }
 
-    textEl.textContent = label;
-    countEl.textContent = arr.length;
+    document.getElementById('queueIndicatorText').textContent = label;
+    document.getElementById('queueIndicatorCount').textContent = unsent > 0 ? unsent : arr.length;
     indicator.classList.add('visible');
 }
 
 function statusLabel(status) {
-    if (status === 'pending') return 'Ожидает';
+    if (status === 'pending') return 'В очереди';
     if (status === 'sending') return 'Отправка';
-    if (status === 'error') return 'Ошибка';
-    if (status === 'sent') return 'Отправлено';
+    if (status === 'error') return 'Не ушла';
+    if (status === 'sent') return 'Записана';
     return status;
 }
 
 function renderQueueList() {
     var body = document.getElementById('queueListBody');
     var empty = document.getElementById('queueEmpty');
+    var hint = document.getElementById('queueHint');
     if (!body) return;
 
     var arr = queueLoad();
     body.innerHTML = '';
+
+    if (!currentUser.password && arr.some(function(it) { return it.status !== 'sent'; })) {
+        hint.textContent = 'Войдите в систему — заявки уйдут автоматически.';
+        hint.style.display = 'block';
+    } else if (!navigator.onLine) {
+        hint.textContent = 'Нет подключения. Заявки уйдут, как только связь восстановится.';
+        hint.style.display = 'block';
+    } else {
+        hint.style.display = 'none';
+    }
 
     if (arr.length === 0) {
         empty.style.display = 'block';
@@ -1283,32 +1518,37 @@ function renderQueueList() {
     empty.style.display = 'none';
 
     arr.slice().reverse().forEach(function(item) {
-        var sub = (item.payload.department || '-') + ' • ' +
-                  (item.payload.object || '-') + ' • ' +
-                  (item.payload.category || '-');
+        var sub = esc(item.payload.department || '-') + ' • ' +
+                  esc(item.payload.object || '-') + ' • ' +
+                  esc(item.payload.category || '-');
+
         var posCount = 0;
-        try { posCount = JSON.parse(decodeURIComponent(item.payload.positions)).length; } catch (e) {}
+        try { posCount = JSON.parse(decodeURIComponent(item.payload.positions)).length; } catch (e) { }
 
         var errHtml = (item.status === 'error' && item.lastError)
-            ? '<div class="qitem-err">' + item.lastError + '</div>' : '';
+            ? '<div class="qitem-err">' + esc(item.lastError) + '</div>' : '';
 
         var actionsHtml = '';
         if (item.status === 'error') {
-            actionsHtml += '<button class="btn btn-primary" onclick="retryQueueItem(\'' + item.id + '\')">↻ Повторить</button>';
+            actionsHtml += '<button class="btn btn-primary" onclick="retryQueueItem(\'' + esc(item.id) + '\')">↻ Отправить</button>';
         }
-        if (item.status === 'error' || item.status === 'sent') {
-            actionsHtml += '<button class="btn btn-danger" onclick="removeQueueItem(\'' + item.id + '\')">✕ Убрать</button>';
+        if (item.status === 'error' || item.status === 'sent' || item.status === 'pending') {
+            actionsHtml += '<button class="btn btn-danger" onclick="removeQueueItem(\'' + esc(item.id) + '\')">✕ Убрать</button>';
         }
+
+        var title = item.orderNumber
+            ? 'Заявка ' + esc(item.orderNumber)
+            : 'Заявка от ' + esc(item.payload.createdBy || '-');
 
         var div = document.createElement('div');
         div.className = 'queue-item';
         div.innerHTML =
             '<div class="qitem-main">' +
-                '<div class="qitem-title">' + (item.orderNumber ? ('Заявка ' + item.orderNumber) : 'Новая заявка') + '</div>' +
+                '<div class="qitem-title">' + title + '</div>' +
                 '<div class="qitem-sub">' + sub + ' • позиций: ' + posCount + '</div>' +
-                '<div class="qitem-sub">Создана: ' + item.createdAt + '</div>' +
+                '<div class="qitem-sub">Создана: ' + esc(item.createdAt) + '</div>' +
                 errHtml +
-                '<span class="qitem-status ' + item.status + '">' + statusLabel(item.status) + '</span>' +
+                '<span class="qitem-status ' + esc(item.status) + '">' + esc(statusLabel(item.status)) + '</span>' +
             '</div>' +
             '<div class="qitem-actions">' + actionsHtml + '</div>';
         body.appendChild(div);
@@ -1324,148 +1564,71 @@ function closeQueueModal() {
     document.getElementById('queueModal').classList.remove('active');
 }
 
-function removeQueueItem(id) {
-    queueRemove(id);
-}
-
-// Ручной повтор отправки для записи со статусом error.
-// Использует ТОТ ЖЕ формат payload, что и saveOrder.
-async function retryQueueItem(id) {
-    var arr = queueLoad();
-    var item = null;
-    for (var i = 0; i < arr.length; i++) { if (arr[i].id === id) { item = arr[i]; break; } }
-    if (!item) return;
-
-    queueUpdate(id, { status: 'sending', lastError: '' });
-    showLoading();
-
-    var result = await apiRequest({
-        action: 'saveOrder',
-        password: currentUser.password,
-        department: item.payload.department,
-        object: item.payload.object,
-        category: item.payload.category,
-        createdBy: item.payload.createdBy,
-        positions: item.payload.positions
-    });
-
-    hideLoading();
-
-    if (result.success) {
-        queueUpdate(id, { status: 'sent', orderNumber: result.orderNumber, lastError: '' });
-        showToast('Заявка ' + result.orderNumber + ' отправлена!', 'success');
-    } else {
-        var msg = result.timeout
-            ? 'Сервер долго отвечает. Проверьте историю - возможно, заявка сохранена.'
-            : (result.error || 'Ошибка отправки');
-        queueUpdate(id, { status: 'error', lastError: msg });
-        showToast(msg, result.timeout ? 'warning' : 'error');
-    }
-}
-
 // ============================================================
-// СОХРАНЕНИЕ ЗАЯВКИ - доработано: постановка в очередь
-// Формат payload для saveOrder НЕ изменён.
+// СОХРАНЕНИЕ ЗАЯВКИ - постановка в очередь
 // ============================================================
 
-async function saveOrder() {
+function saveOrder() {
     var department = document.getElementById('orderDepartment').value;
     var object = document.getElementById('orderObject').value.trim();
     var category = document.getElementById('orderCategory').value;
     var createdBy = document.getElementById('orderCreatedBy').value;
+    var isPrivate = document.getElementById('orderPrivate').checked ? '1' : '0';
 
-    if (!object) {
-        showToast('Укажите объект', 'error');
-        return;
-    }
-    if (!category) {
-        showToast('Выберите категорию', 'error');
-        return;
-    }
-    if (!createdBy) {
-        showToast('Укажите, кто создал заявку', 'error');
-        return;
-    }
+    if (!object) { showToast('Укажите объект', 'error'); return; }
+    if (!category) { showToast('Выберите категорию', 'error'); return; }
+    if (!createdBy) { showToast('Укажите, кто создал заявку', 'error'); return; }
 
     var positions = getPositionsData();
-
-    if (positions.length === 0) {
-        showToast('Добавьте хотя бы одну позицию', 'error');
-        return;
-    }
+    if (positions.length === 0) { showToast('Добавьте хотя бы одну позицию', 'error'); return; }
 
     for (var i = 0; i < positions.length; i++) {
-        if (!positions[i].name) {
-            showToast('Укажите наименование в позиции ' + (i + 1), 'error');
-            return;
-        }
-        if (!positions[i].unit) {
-            showToast('Выберите ед. измерения в позиции ' + (i + 1), 'error');
-            return;
-        }
+        if (!positions[i].name) { showToast('Укажите наименование в позиции ' + (i + 1), 'error'); return; }
+        if (!positions[i].unit) { showToast('Выберите ед. измерения в позиции ' + (i + 1), 'error'); return; }
         if (!positions[i].quantity || positions[i].quantity <= 0) {
             showToast('Укажите количество в позиции ' + (i + 1), 'error');
             return;
         }
     }
 
-    // ДОБАВЛЕНО: чистим ранее успешно отправленные записи
-    queueClearSent();
+    if (queueUnsentCount() >= MAX_UNSENT) {
+        showToast('В очереди уже ' + MAX_UNSENT + ' неотправленных заявок. Дождитесь отправки.', 'warning');
+        openQueueModal();
+        return;
+    }
 
-    // ДОБАВЛЕНО: формируем payload в ТОМ ЖЕ формате, что и запрос
-    var encodedPositions = encodeURIComponent(JSON.stringify(positions));
     var queueId = 'q_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
     queueAdd({
         id: queueId,
         status: 'pending',
         createdAt: formatDate(new Date()),
         orderNumber: '',
         lastError: '',
+        attempts: 0,
         payload: {
             department: department,
             object: object,
             category: category,
             createdBy: createdBy,
-            positions: encodedPositions
+            isPrivate: isPrivate,
+            localDate: formatDate(new Date()),   // время с компьютера пользователя
+            positions: encodeURIComponent(JSON.stringify(positions))
         }
     });
 
-    queueUpdate(queueId, { status: 'sending' });
-    showLoading();
-
-    var result = await apiRequest({
-        action: 'saveOrder',
-        password: currentUser.password,
-        department: department,
-        object: object,
-        category: category,
-        createdBy: createdBy,
-        positions: encodedPositions
-    });
-
-        hideLoading();
-
-    // ДОБАВЛЕНО: фиксируем результат в очереди
-    if (result.success) {
-        queueUpdate(queueId, { status: 'sent', orderNumber: result.orderNumber, lastError: '' });
-        showToast('Заявка ' + result.orderNumber + ' сохранена!', 'success');
-        clearForm();
-    } else {
-        var errMsg = result.timeout
-            ? 'Сервер долго отвечает. Проверьте историю - возможно, заявка сохранена.'
-            : (result.error || 'Ошибка сохранения');
-        queueUpdate(queueId, { status: 'error', lastError: errMsg });
-        showToast(errMsg, result.timeout ? 'warning' : 'error');
-    }
+    showToast('Заявка поставлена в очередь на отправку', 'success');
+    clearForm();
+    queueProcess();
 }
 
 // ============================================================
-// ИСТОРИЯ ЗАЯВОК - без изменений
+// ИСТОРИЯ ЗАЯВОК (порциями по 15)
 // ============================================================
 
 function openHistory() {
     document.getElementById('historyModal').classList.add('active');
-    loadHistory();
+    loadHistory(false);
 }
 
 function closeHistory() {
@@ -1475,77 +1638,181 @@ function closeHistory() {
 function clearFilters() {
     document.getElementById('filterDepartment').value = '';
     document.getElementById('filterDate').value = '';
-    loadHistory();
+    loadHistory(false);
 }
 
-async function loadHistory() {
+async function loadHistory(append) {
+    if (historyLoading) return;
+    historyLoading = true;
+
+    var tbody = document.getElementById('historyBody');
+    var emptyDiv = document.getElementById('historyEmpty');
+    var loadMoreWrap = document.getElementById('loadMoreWrap');
+    var counter = document.getElementById('historyCounter');
+
+    if (!append) {
+        historyOffset = 0;
+        historyTotal = 0;
+        tbody.innerHTML = '';
+        loadMoreWrap.style.display = 'none';
+        counter.textContent = '';
+    }
+
     var filterDept = document.getElementById('filterDepartment').value;
     var filterDate = document.getElementById('filterDate').value;
 
-    showLoading();
-
     var formattedDate = '';
     if (filterDate) {
-        var d = new Date(filterDate);
-        formattedDate = String(d.getDate()).padStart(2, '0') + '.' +
-                        String(d.getMonth() + 1).padStart(2, '0') + '.' +
-                        d.getFullYear();
+        var parts = filterDate.split('-');   // yyyy-mm-dd
+        formattedDate = parts[2] + '.' + parts[1] + '.' + parts[0];
     }
 
+    showLoading();
     var result = await apiRequest({
         action: 'getHistory',
         password: currentUser.password,
         filterDept: filterDept,
-        filterDate: formattedDate
+        filterDate: formattedDate,
+        offset: historyOffset,
+        limit: HISTORY_PAGE
+    });
+    hideLoading();
+    historyLoading = false;
+
+    if (!result.success) {
+        emptyDiv.textContent = result.timeout
+            ? 'Сервер долго отвечает. Попробуйте ещё раз.'
+            : (result.error || 'Ошибка загрузки');
+        emptyDiv.style.display = tbody.querySelectorAll('tr').length === 0 ? 'block' : 'none';
+        return;
+    }
+
+    historyTotal = result.total || 0;
+    var orders = result.orders || [];
+
+    if (orders.length === 0 && historyOffset === 0) {
+        emptyDiv.textContent = 'Заявки не найдены';
+        emptyDiv.style.display = 'block';
+        loadMoreWrap.style.display = 'none';
+        counter.textContent = '';
+        return;
+    }
+
+    emptyDiv.style.display = 'none';
+    var isAdmin = currentUser.role === 'admin';
+
+    orders.forEach(function(order) {
+        var statusClass = 'pending';
+        var statusText = 'Ожидает';
+
+        if (order.completedPositions === order.totalPositions && order.totalPositions > 0) {
+            statusClass = 'completed';
+            statusText = 'Выполнено';
+        } else if (order.completedPositions > 0) {
+            statusClass = 'partial';
+            statusText = order.completedPositions + '/' + order.totalPositions;
+        }
+
+        var viewedClass = order.viewed == 1 ? 'viewed' : 'not-viewed';
+        var viewedIcon = order.viewed == 1 ? '👁' : '✕';
+
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-order-id', order.id);
+        tr.onclick = function() { openOrderDetails(order.id); };
+        tr.innerHTML =
+            '<td><strong>' + esc(order.number) + '</strong>' +
+                (order.isPrivate == 1 ? ' 🔒' : '') + '</td>' +
+            '<td>' + esc(order.date) + '</td>' +
+            '<td>' + esc(order.department) + '</td>' +
+            '<td>' + esc(order.object || '-') + '</td>' +
+            '<td>' + esc(order.category) + '</td>' +
+            '<td>' + esc(order.createdBy || '-') + '</td>' +
+            '<td class="cell-status"><span class="status-badge ' + statusClass + '">' + esc(statusText) + '</span></td>' +
+            '<td class="col-viewed">' +
+                '<button class="status-btn ' + viewedClass + '" ' +
+                    'title="' + (order.viewed == 1 ? 'Заявка просмотрена' : 'Заявка не просмотрена') + '" ' +
+                    'onclick="toggleViewed(event, \'' + esc(order.id) + '\', ' + (order.viewed == 1 ? 1 : 0) + ')" ' +
+                    (isAdmin ? '' : 'disabled') + '>' + viewedIcon + '</button>' +
+            '</td>';
+
+        tbody.appendChild(tr);
     });
 
-    hideLoading();
+    historyOffset += orders.length;
+    loadMoreWrap.style.display = result.hasMore ? 'block' : 'none';
+    counter.textContent = 'Показано ' + historyOffset + ' из ' + historyTotal;
+}
 
-    var tbody = document.getElementById('historyBody');
-    var emptyDiv = document.getElementById('historyEmpty');
+// Обновляет одну строку истории без перезагрузки списка
+function updateHistoryRow(orderId, completed, total, viewed) {
+    var tr = document.querySelector('#historyBody tr[data-order-id="' + orderId + '"]');
+    if (!tr) return;
 
-    if (result.success && result.orders && result.orders.length > 0) {
-        tbody.innerHTML = '';
-        emptyDiv.style.display = 'none';
+    if (completed !== null) {
+        var statusClass = 'pending', statusText = 'Ожидает';
+        if (completed === total && total > 0) { statusClass = 'completed'; statusText = 'Выполнено'; }
+        else if (completed > 0) { statusClass = 'partial'; statusText = completed + '/' + total; }
+        var cell = tr.querySelector('.cell-status');
+        if (cell) cell.innerHTML = '<span class="status-badge ' + statusClass + '">' + esc(statusText) + '</span>';
+    }
 
-        result.orders.forEach(function(order) {
-            var statusClass = 'pending';
-            var statusText = 'Ожидает';
-
-            if (order.completedPositions === order.totalPositions && order.totalPositions > 0) {
-                statusClass = 'completed';
-                statusText = 'Выполнено';
-            } else if (order.completedPositions > 0) {
-                statusClass = 'partial';
-                statusText = order.completedPositions + '/' + order.totalPositions;
-            }
-
-            var tr = document.createElement('tr');
-            tr.onclick = function() { openOrderDetails(order.id); };
-            tr.innerHTML =
-                '<td><strong>' + order.number + '</strong></td>' +
-                '<td>' + order.date + '</td>' +
-                '<td>' + order.department + '</td>' +
-                '<td>' + (order.object || '-') + '</td>' +
-                '<td>' + order.category + '</td>' +
-                '<td>' + (order.createdBy || '-') + '</td>' +
-                '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
-
-            tbody.appendChild(tr);
-        });
-    } else {
-        tbody.innerHTML = '';
-        if (result.timeout) {
-            emptyDiv.textContent = 'Сервер долго отвечает. Попробуйте позже.';
-        } else {
-            emptyDiv.textContent = 'Заявки не найдены';
+    if (viewed !== null) {
+        var btn = tr.querySelector('.col-viewed .status-btn');
+        if (btn) {
+            btn.className = 'status-btn ' + (viewed == 1 ? 'viewed' : 'not-viewed');
+            btn.textContent = viewed == 1 ? '👁' : '✕';
+            btn.setAttribute('onclick', 'toggleViewed(event, \'' + orderId + '\', ' + (viewed == 1 ? 1 : 0) + ')');
         }
-        emptyDiv.style.display = 'block';
     }
 }
 
 // ============================================================
-// ДЕТАЛИ ЗАЯВКИ - без изменений
+// ОТМЕТКА "ПРОСМОТРЕНО" (только администратор)
+// ============================================================
+
+async function toggleViewed(event, orderId, currentViewed) {
+    if (event) event.stopPropagation();
+    if (currentUser.role !== 'admin') {
+        showToast('Отметку ставит только администратор', 'warning');
+        return;
+    }
+
+    var newViewed = currentViewed == 1 ? 0 : 1;
+    showLoading();
+    var result = await apiRequest({
+        action: 'setViewed',
+        password: currentUser.password,
+        orderId: orderId,
+        viewed: newViewed
+    });
+    hideLoading();
+
+    if (result.success) {
+        updateHistoryRow(orderId, null, null, newViewed);
+        if (currentOrderId === orderId) {
+            currentOrderViewed = newViewed;
+            renderDetailViewed();
+        }
+        showToast(newViewed == 1 ? 'Отмечено как просмотренное' : 'Отметка снята', 'success');
+    } else {
+        showToast(result.error || 'Не удалось изменить отметку', 'error');
+    }
+}
+
+function renderDetailViewed() {
+    var wrap = document.getElementById('detailViewedWrap');
+    var isAdmin = currentUser.role === 'admin';
+    var viewed = currentOrderViewed == 1;
+
+    wrap.innerHTML =
+        '<button class="status-btn ' + (viewed ? 'viewed' : 'not-viewed') + '" ' +
+            'title="' + (viewed ? 'Просмотрена' : 'Не просмотрена') + '" ' +
+            'onclick="toggleViewed(event, \'' + esc(currentOrderId) + '\', ' + (viewed ? 1 : 0) + ')" ' +
+            (isAdmin ? '' : 'disabled') + '>' + (viewed ? '👁' : '✕') + '</button>';
+}
+
+// ============================================================
+// ДЕТАЛИ ЗАЯВКИ
 // ============================================================
 
 async function openOrderDetails(orderId) {
@@ -1560,69 +1827,81 @@ async function openOrderDetails(orderId) {
 
     hideLoading();
 
-    if (result.success) {
-        var order = result.order;
-
-        document.getElementById('detailsOrderNumber').textContent = order.number;
-        document.getElementById('detailNumber').textContent = order.number;
-        document.getElementById('detailDate').textContent = order.date;
-        document.getElementById('detailDepartment').textContent = order.department;
-        document.getElementById('detailObject').textContent = order.object || '-';
-        document.getElementById('detailCategory').textContent = order.category;
-        document.getElementById('detailCreatedBy').textContent = order.createdBy || '-';
-
-        document.getElementById('deleteOrderBtn').style.display =
-            currentUser.role === 'admin' ? 'inline-flex' : 'none';
-
-        var tbody = document.getElementById('detailsPositionsBody');
-        tbody.innerHTML = '';
-
-        result.positions.forEach(function(pos) {
-            var statusClass = pos.status == 1 ? 'completed' : 'not-completed';
-            var statusIcon = pos.status == 1 ? '✓' : '✕';
-            var canChange = result.canChangeStatus && (currentUser.role === 'admin' || pos.status == 0);
-
-            var tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td class="col-num">' + pos.position + '</td>' +
-                '<td class="col-name">' + pos.name + '</td>' +
-                '<td class="col-unit">' + pos.unit + '</td>' +
-                '<td class="col-qty">' + pos.quantity + '</td>' +
-                '<td class="col-article">' + (pos.article || '-') + '</td>' +
-                '<td class="col-note">' + (pos.note || '-') + '</td>' +
-                '<td class="col-status">' +
-                    '<button class="status-btn ' + statusClass + '" ' +
-                        'onclick="toggleStatus(' + pos.rowIndex + ', ' + pos.status + ', \'' + orderId + '\')" ' +
-                        (canChange ? '' : 'disabled') + '>' +
-                        statusIcon +
-                    '</button>' +
-                '</td>';
-
-            tbody.appendChild(tr);
-        });
-
-        document.getElementById('historyModal').classList.remove('active');
-        document.getElementById('orderDetailsModal').classList.add('active');
-    } else {
-        if (result.timeout) {
-            showToast('Сервер долго отвечает. Попробуйте позже.', 'warning');
-        } else {
-            showToast(result.error || 'Ошибка загрузки заявки', 'error');
-        }
+    if (!result.success) {
+        showToast(result.timeout ? 'Сервер долго отвечает. Попробуйте ещё раз.' : (result.error || 'Ошибка загрузки заявки'),
+                  result.timeout ? 'warning' : 'error');
+        return;
     }
+
+    var order = result.order;
+    currentOrderViewed = order.viewed;
+
+    document.getElementById('detailsOrderNumber').textContent = order.number;
+    document.getElementById('detailNumber').textContent = order.number;
+    document.getElementById('detailDate').textContent = order.date;
+    document.getElementById('detailDepartment').textContent = order.department;
+    document.getElementById('detailObject').textContent = order.object || '-';
+    document.getElementById('detailCategory').textContent = order.category;
+    document.getElementById('detailCreatedBy').textContent = order.createdBy || '-';
+    renderDetailViewed();
+
+    document.getElementById('deleteOrderBtn').style.display =
+        result.canEdit ? 'inline-flex' : 'none';
+
+    var tbody = document.getElementById('detailsPositionsBody');
+    tbody.innerHTML = '';
+
+    result.positions.forEach(function(pos) {
+        var statusClass = pos.status == 1 ? 'completed' : 'not-completed';
+        var statusIcon = pos.status == 1 ? '✓' : '✕';
+        // Общий пул: отмечать выполнение может любой пользователь.
+        // Снять отметку - только администратор.
+        var canChange = result.canChangeStatus && (currentUser.role === 'admin' || pos.status == 0);
+
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td class="col-num">' + esc(pos.position) + '</td>' +
+            '<td class="col-name">' + esc(pos.name) + '</td>' +
+            '<td class="col-unit">' + esc(pos.unit) + '</td>' +
+            '<td class="col-qty">' + esc(pos.quantity) + '</td>' +
+            '<td class="col-article">' + esc(pos.article || '-') + '</td>' +
+            '<td class="col-note">' + esc(pos.note || '-') + '</td>' +
+            '<td class="col-status">' +
+                '<button class="status-btn ' + statusClass + '" ' +
+                    'onclick="toggleStatus(this, ' + esc(pos.rowIndex) + ', ' + (pos.status == 1 ? 1 : 0) + ', \'' + esc(orderId) + '\')" ' +
+                    (canChange ? '' : 'disabled') + '>' +
+                    statusIcon +
+                '</button>' +
+            '</td>';
+
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('historyModal').classList.remove('active');
+    document.getElementById('orderDetailsModal').classList.add('active');
 }
 
 function closeOrderDetails() {
+    // Обновляем строку в списке, не перезагружая всю историю
+    if (currentOrderId) {
+        var rows = document.getElementById('detailsPositionsBody').querySelectorAll('tr');
+        var total = rows.length, completed = 0;
+        rows.forEach(function(row) {
+            if (row.querySelector('.status-btn.completed')) completed++;
+        });
+        updateHistoryRow(currentOrderId, completed, total, currentOrderViewed);
+    }
+
     document.getElementById('orderDetailsModal').classList.remove('active');
     currentOrderId = null;
-    openHistory();
+    document.getElementById('historyModal').classList.add('active');
 }
 
 // ============================================================
-// ИЗМЕНЕНИЕ СТАТУСА ПОЗИЦИИ - без изменений
+// СТАТУС ПОЗИЦИИ
 // ============================================================
 
-async function toggleStatus(rowIndex, currentStatus, orderId) {
+async function toggleStatus(btn, rowIndex, currentStatus, orderId) {
     var newStatus = currentStatus == 1 ? 0 : 1;
 
     if (currentUser.role !== 'admin' && currentStatus == 1) {
@@ -1630,6 +1909,7 @@ async function toggleStatus(rowIndex, currentStatus, orderId) {
         return;
     }
 
+    btn.disabled = true;
     showLoading();
 
     var result = await apiRequest({
@@ -1641,32 +1921,36 @@ async function toggleStatus(rowIndex, currentStatus, orderId) {
     });
 
     hideLoading();
+    btn.disabled = false;
 
     if (result.success) {
+        // Обновляем только эту кнопку - без перезагрузки всей заявки
+        btn.className = 'status-btn ' + (newStatus == 1 ? 'completed' : 'not-completed');
+        btn.textContent = newStatus == 1 ? '✓' : '✕';
+        btn.setAttribute('onclick',
+            'toggleStatus(this, ' + rowIndex + ', ' + newStatus + ', \'' + orderId + '\')');
+        if (newStatus == 1 && currentUser.role !== 'admin') btn.disabled = true;
         showToast(newStatus == 1 ? 'Позиция выполнена' : 'Выполнение отменено', 'success');
-        openOrderDetails(orderId);
     } else {
-        if (result.timeout) {
-            showToast('Сервер долго отвечает. Попробуйте обновить страницу.', 'warning');
-        } else {
-            showToast(result.error || 'Ошибка обновления статуса', 'error');
-        }
+        showToast(result.timeout ? 'Сервер долго отвечает. Попробуйте ещё раз.' : (result.error || 'Ошибка обновления статуса'),
+                  result.timeout ? 'warning' : 'error');
     }
 }
 
 // ============================================================
-// УДАЛЕНИЕ ЗАЯВКИ - без изменений
+// УДАЛЕНИЕ ЗАЯВКИ
 // ============================================================
 
 async function deleteCurrentOrder() {
     if (!currentOrderId) return;
     if (!confirm('Вы уверены, что хотите удалить эту заявку?')) return;
 
+    var deletedId = currentOrderId;
     showLoading();
 
     var result = await apiRequest({
         action: 'deleteOrder',
-        orderId: currentOrderId,
+        orderId: deletedId,
         password: currentUser.password
     });
 
@@ -1674,18 +1958,19 @@ async function deleteCurrentOrder() {
 
     if (result.success) {
         showToast('Заявка удалена', 'success');
-        closeOrderDetails();
+        var tr = document.querySelector('#historyBody tr[data-order-id="' + deletedId + '"]');
+        if (tr) tr.remove();
+        document.getElementById('orderDetailsModal').classList.remove('active');
+        currentOrderId = null;
+        document.getElementById('historyModal').classList.add('active');
     } else {
-        if (result.timeout) {
-            showToast('Сервер долго отвечает. Проверьте историю заявок.', 'warning');
-        } else {
-            showToast(result.error || 'Ошибка удаления', 'error');
-        }
+        showToast(result.timeout ? 'Сервер долго отвечает. Проверьте историю заявок.' : (result.error || 'Ошибка удаления'),
+                  result.timeout ? 'warning' : 'error');
     }
 }
 
 // ============================================================
-// ПЕЧАТЬ - без изменений
+// ПЕЧАТЬ
 // ============================================================
 
 function printOrder() {
@@ -1739,20 +2024,26 @@ function generatePrintContent(data) {
         positionsHTML +=
             '<tr>' +
                 '<td style="border:1px solid #000;padding:8px;text-align:center;">' + (index + 1) + '</td>' +
-                '<td style="border:1px solid #000;padding:8px;">' + pos.name + '</td>' +
-                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + pos.unit + '</td>' +
-                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + pos.quantity + '</td>' +
-                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + (pos.article || '-') + '</td>' +
-                '<td style="border:1px solid #000;padding:8px;">' + (pos.note || '-') + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;">' + esc(pos.name) + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + esc(pos.unit) + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + esc(pos.quantity) + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;text-align:center;">' + esc(pos.article || '-') + '</td>' +
+                '<td style="border:1px solid #000;padding:8px;">' + esc(pos.note || '-') + '</td>' +
             '</tr>';
     });
 
     var printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        showToast('Браузер заблокировал окно печати. Разрешите всплывающие окна.', 'warning');
+        return;
+    }
+
     printWindow.document.write(
         '<!DOCTYPE html>' +
         '<html>' +
         '<head>' +
-            '<title>Заявка ' + data.number + '</title>' +
+            '<meta charset="UTF-8">' +
+            '<title>Заявка ' + esc(data.number) + '</title>' +
             '<style>' +
                 'body { font-family: Arial, sans-serif; padding: 20px; }' +
                 'h1 { text-align: center; font-size: 18px; margin-bottom: 20px; }' +
@@ -1765,14 +2056,14 @@ function generatePrintContent(data) {
             '</style>' +
         '</head>' +
         '<body>' +
-            '<h1>ЗАЯВКА НА МАТЕРИАЛЫ № ' + data.number + '</h1>' +
+            '<h1>ЗАЯВКА НА МАТЕРИАЛЫ № ' + esc(data.number) + '</h1>' +
 
             '<div class="header-info">' +
-                '<p><strong>Дата:</strong> ' + data.date + '</p>' +
-                '<p><strong>Подразделение:</strong> ' + data.department + '</p>' +
-                '<p><strong>Объект:</strong> ' + (data.object || '-') + '</p>' +
-                '<p><strong>Категория:</strong> ' + data.category + '</p>' +
-                '<p><strong>Создал заявку:</strong> ' + (data.createdBy || '-') + '</p>' +
+                '<p><strong>Дата:</strong> ' + esc(data.date) + '</p>' +
+                '<p><strong>Подразделение:</strong> ' + esc(data.department) + '</p>' +
+                '<p><strong>Объект:</strong> ' + esc(data.object || '-') + '</p>' +
+                '<p><strong>Категория:</strong> ' + esc(data.category) + '</p>' +
+                '<p><strong>Создал заявку:</strong> ' + esc(data.createdBy || '-') + '</p>' +
             '</div>' +
 
             '<table>' +
@@ -1791,7 +2082,7 @@ function generatePrintContent(data) {
 
             '<div class="footer">' +
                 '<div class="signature-block">' +
-                    '<p><strong>Создал заявку:</strong> _______________ / ' + (data.createdBy || '_______________') + ' /</p>' +
+                    '<p><strong>Создал заявку:</strong> _______________ / ' + esc(data.createdBy || '_______________') + ' /</p>' +
                 '</div>' +
                 '<div class="signature-block">' +
                     '<p><strong>Принял в работу:</strong> _______________ / _______________ /</p>' +
@@ -1806,23 +2097,47 @@ function generatePrintContent(data) {
 }
 
 // ============================================================
-// ИНИЦИАЛИЗАЦИЯ - доработано: отрисовка индикатора очереди
+// ИНИЦИАЛИЗАЦИЯ
 // ============================================================
 
 document.getElementById('passwordInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        handleLogin();
+    if (e.key === 'Enter') handleLogin();
+});
+
+// Связь восстановилась - дожимаем очередь
+window.addEventListener('online', function() {
+    showToast('Связь восстановлена, отправляю очередь', 'success');
+    var arr = queueLoad();
+    var changed = false;
+    arr.forEach(function(it) {
+        if (it.status === 'error') { it.status = 'pending'; it.attempts = 0; changed = true; }
+    });
+    if (changed) queueSave(arr);
+    renderQueue();
+    queueProcess();
+});
+
+window.addEventListener('offline', function() {
+    showToast('Связь потеряна. Заявки сохраняются в очереди.', 'warning');
+    renderQueue();
+});
+
+// Предупреждаем, если закрывают вкладку с неотправленными заявками
+window.addEventListener('beforeunload', function(e) {
+    if (queueUnsentCount() > 0) {
+        e.preventDefault();
+        e.returnValue = '';
     }
 });
 
 window.onload = function() {
+    queueRecoverStuck();
+    renderQueue();
     checkSession();
-    renderQueueIndicator(); // ДОБАВЛЕНО: показать очередь, если есть незавершённые
 };
-
 </script>
 </body>
 </html>
 <!-- ============================================================
-     КОНЕЦ ФАЙЛА index.html (с буфером очереди отправки)
+     КОНЕЦ ФАЙЛА index.html (версия 3.0)
      ============================================================ -->
